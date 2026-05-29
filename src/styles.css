@@ -93,6 +93,12 @@ button {
   color: inherit;
 }
 
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid rgba(185, 150, 210, 0.95);
+  outline-offset: 3px;
+}
+
 img,
 svg {
   display: block;
@@ -245,6 +251,7 @@ svg {
 .topbar__brand {
   display: grid;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .topbar__eyebrow {
@@ -296,6 +303,7 @@ svg {
 .topbar__meta {
   display: grid;
   gap: 0.7rem;
+  min-width: 0;
 }
 
 .topbar__counts {
@@ -314,6 +322,7 @@ svg {
   margin: 0;
   line-height: 1.45;
   color: rgba(245, 239, 230, 0.84);
+  overflow-wrap: anywhere;
 }
 
 .view-switcher {
@@ -1242,6 +1251,37 @@ svg {
     right: 0.25rem;
     bottom: calc(4.35rem + env(safe-area-inset-bottom));
     max-height: 84dvh;
+  }
+}
+
+@media (max-width: 390px) {
+  .topbar {
+    padding: 0.8rem;
+  }
+
+  .topbar h1 {
+    font-size: 1.15rem;
+  }
+
+  .topbar__subtitle,
+  .topbar__selected {
+    font-size: 0.82rem;
+  }
+
+  .brain-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .brain-map {
+    min-height: 17rem;
+  }
+
+  .brain-node {
+    width: clamp(6rem, 44vw, 8rem);
+  }
+
+  .brain-node--focus {
+    width: clamp(8rem, 58vw, 10rem);
   }
 }
 

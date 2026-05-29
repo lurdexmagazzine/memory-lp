@@ -26,9 +26,9 @@ export function TopBar({
   return (
     <header className="topbar">
       <div className="topbar__brand">
-        <p className="topbar__eyebrow">memory-lp</p>
-        <h1>Brain & Diary Viewer</h1>
-        <p className="topbar__subtitle">Leitura somente · memória, diário, relações e inspeção</p>
+        <p className="topbar__eyebrow">Lurdex</p>
+        <h1>Memory Console</h1>
+        <p className="topbar__subtitle">Brain, Diary e Inspector em uma leitura operacional do acervo</p>
       </div>
 
       <label className="topbar__search search-field" htmlFor="global-search">

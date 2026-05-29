@@ -17,6 +17,11 @@ function relationLabel(kind: MemoryRelation['kind']): string {
   }
 }
 
+function counterpartRecord(record: MemoryEntry, relation: MemoryRelation, records: MemoryEntry[]): MemoryEntry | undefined {
+  const counterpartId = relation.fromId === record.id ? relation.toId : relation.fromId;
+  return records.find((item) => item.id === counterpartId);
+}
+
 export function InspectorPanel({
   record,
   records,
@@ -155,10 +160,7 @@ export function InspectorPanel({
             {activeRelations.length ? (
               <div className="inspector-relations">
                 {activeRelations.map((relation) => {
-                  const counterpart = records.find((item) =>
-                    record ? (relation.fromId === record.id ? item.id === relation.toId : item.id === relation.fromId) : false,
-                  );
-
+                  const counterpart = record ? counterpartRecord(record, relation, records) : undefined;
                   return (
                     <button
                       key={`${relation.fromId}-${relation.toId}-${relation.kind}`}

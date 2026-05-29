@@ -21,7 +21,7 @@ export function ShellSidebar({
     <aside className="shell-sidebar">
       <div className="shell-sidebar__brand">
         <p className="shell-sidebar__eyebrow">Lurdex</p>
-        <h2>memory-lp</h2>
+        <h2>Memory OS</h2>
         <p className="shell-sidebar__subtitle">visão de cérebro, diário e inspeção</p>
       </div>
 

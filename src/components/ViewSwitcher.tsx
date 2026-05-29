@@ -16,7 +16,7 @@ export function ViewSwitcher({
   compact?: boolean;
 }) {
   return (
-    <div className={compact ? 'view-switcher view-switcher--compact' : 'view-switcher'} role="tablist" aria-label="Navegação principal">
+    <div className={compact ? 'view-switcher view-switcher--compact' : 'view-switcher'} role="group" aria-label="Navegação principal">
       {(Object.keys(TAB_LABELS) as BrainSurface[]).map((key) => (
         <button
           key={key}
