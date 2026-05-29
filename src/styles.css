@@ -387,9 +387,11 @@ svg {
 
 .index-toolbar__brand h1 {
   margin: 0;
-  font-size: 1rem;
+  font-family: var(--font-serif);
+  font-size: 1.06rem;
+  font-weight: 600;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
 }
 
 .index-toolbar__count {
@@ -499,28 +501,52 @@ svg {
 
 .day-group {
   display: grid;
-  gap: 0.65rem;
-  padding: 0.82rem 0.82rem 0.78rem 1rem;
-  border: 1px solid rgba(111, 89, 68, 0.1);
-  border-radius: 22px;
+  gap: 0.62rem;
+  padding: 0.8rem 0.76rem 0.72rem 0.96rem;
+  border: 1px solid rgba(111, 89, 68, 0.07);
+  border-radius: 20px;
   background:
-    linear-gradient(180deg, rgba(255, 249, 241, 0.92), rgba(250, 242, 231, 0.86)),
-    rgba(255, 249, 240, 0.72);
-  box-shadow: 0 10px 26px rgba(28, 24, 18, 0.04);
+    linear-gradient(180deg, rgba(255, 250, 244, 0.9), rgba(248, 241, 231, 0.78)),
+    rgba(255, 249, 240, 0.62);
+  box-shadow: 0 6px 18px rgba(28, 24, 18, 0.025);
   position: relative;
+  overflow: clip;
 }
 
 .day-group::before {
   content: '';
   position: absolute;
-  left: -0.32rem;
-  top: 1rem;
-  width: 0.62rem;
-  height: 0.62rem;
+  left: 0;
+  top: 0.95rem;
+  width: 0.22rem;
+  height: calc(100% - 1.6rem);
   border-radius: 999px;
-  border: 1px solid rgba(124, 112, 143, 0.22);
-  background: linear-gradient(180deg, rgba(255, 250, 244, 0.96), rgba(226, 219, 236, 0.85));
-  box-shadow: 0 8px 18px rgba(124, 112, 143, 0.1);
+  background: linear-gradient(180deg, rgba(124, 112, 143, 0.34), rgba(111, 89, 68, 0.08));
+}
+
+.day-group::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0,
+    transparent 26px,
+    rgba(111, 89, 68, 0.028) 26px,
+    rgba(111, 89, 68, 0.028) 27px
+  );
+  opacity: 0.48;
+}
+
+.day-group > * {
+  position: relative;
+  z-index: 1;
+}
+
+.day-group__header {
+  padding-bottom: 0.1rem;
+  border-bottom: 1px solid rgba(111, 89, 68, 0.06);
 }
 
 .day-group__header {
@@ -568,44 +594,99 @@ svg {
 .memory-list-item {
   position: relative;
   display: grid;
-  gap: 0.26rem;
-  padding: 0.48rem 0.48rem 0.46rem 0.62rem;
-  border-radius: 18px;
-  border: 1px solid rgba(33, 31, 27, 0.08);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(252, 246, 238, 0.92)),
-    rgba(255, 255, 255, 0.84);
-  box-shadow: var(--shadow-sm);
+  gap: 0.22rem;
+  padding: 0.18rem 0 0.14rem 0.52rem;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.memory-list-item::before {
+  content: '';
+  position: absolute;
+  left: 0.24rem;
+  top: 0.9rem;
+  bottom: 0.65rem;
+  width: 1px;
+  background: rgba(124, 112, 143, 0.14);
+}
+
+.memory-list-item::after {
+  content: '';
+  position: absolute;
+  left: 0.12rem;
+  top: 1.15rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: rgba(111, 89, 68, 0.24);
+}
+
+.memory-list-item:nth-child(3n + 1) .memory-list-item__body {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(249, 243, 234, 0.84));
+}
+
+.memory-list-item:nth-child(3n + 2) .memory-list-item__body {
+  background: linear-gradient(180deg, rgba(255, 250, 244, 0.77), rgba(244, 236, 225, 0.84));
+}
+
+.memory-list-item:nth-child(3n + 3) .memory-list-item__body {
+  background: linear-gradient(180deg, rgba(252, 247, 240, 0.78), rgba(241, 233, 221, 0.84));
 }
 
 .memory-list-item.is-active {
-  border-color: rgba(124, 112, 143, 0.35);
-  background:
-    linear-gradient(180deg, rgba(255, 250, 244, 0.98), rgba(233, 227, 240, 0.86)),
-    rgba(255, 251, 244, 0.96);
-  box-shadow: 0 12px 28px rgba(124, 112, 143, 0.11);
+  background: transparent;
 }
 
 .memory-list-item.is-active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0.34rem;
-  bottom: 0.34rem;
-  width: 0.2rem;
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(124, 112, 143, 0.96), rgba(111, 89, 68, 0.18));
+  left: 0.14rem;
+  width: 0.3rem;
+  top: 0.46rem;
+  bottom: 0.48rem;
+  background: linear-gradient(180deg, rgba(124, 112, 143, 0.94), rgba(111, 89, 68, 0.18));
+}
+
+.memory-list-item.is-active::after {
+  left: 0.04rem;
+  top: 0.82rem;
+  width: 0.56rem;
+  height: 1.8rem;
+  border-radius: 999px 0 0 999px;
+  background: linear-gradient(180deg, rgba(124, 112, 143, 0.94), rgba(111, 89, 68, 0.2));
+  box-shadow: 0 10px 18px rgba(124, 112, 143, 0.12);
 }
 
 .memory-list-item__body {
   display: grid;
   gap: 0.28rem;
   text-align: left;
-  padding: 0 0 0 0.08rem;
+  padding: 0.68rem 0.72rem 0.62rem 0.78rem;
   cursor: pointer;
   min-width: 0;
   position: relative;
   z-index: 1;
+  border: 1px solid rgba(33, 31, 27, 0.05);
+  border-left: 2px solid rgba(111, 89, 68, 0.16);
+  border-radius: 0 18px 18px 0;
+  box-shadow: 0 8px 16px rgba(28, 24, 18, 0.025);
+}
+
+.memory-list-item__body:hover {
+  border-color: rgba(111, 89, 68, 0.09);
+}
+
+.memory-list-item.is-active .memory-list-item__body {
+  border-color: rgba(124, 112, 143, 0.24);
+  border-left-color: rgba(124, 112, 143, 0.74);
+  box-shadow: 0 12px 24px rgba(124, 112, 143, 0.08);
+}
+
+.memory-list-item__top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
 }
 
 .memory-list-item__title,
@@ -719,10 +800,10 @@ svg {
 .reading-metadata,
 .reading-section {
   display: grid;
-  gap: 0.75rem;
-  padding: 0.95rem 1rem;
-  border-radius: 22px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(249, 241, 230, 0.7));
+  gap: 0.68rem;
+  padding: 0.75rem 0.02rem 0.12rem;
+  border-radius: 0;
+  background: transparent;
   position: relative;
 }
 
@@ -735,23 +816,23 @@ svg {
 }
 
 .reading-metadata .token-pill {
-  padding: 0.36rem 0.62rem;
-  font-size: 0.72rem;
+  padding: 0.34rem 0.58rem;
+  font-size: 0.7rem;
   white-space: nowrap;
 }
 
 .reading-section::before {
   content: '';
   position: absolute;
-  left: 0.85rem;
-  top: 0.8rem;
-  bottom: 0.8rem;
-  width: 1px;
-  background: linear-gradient(180deg, rgba(124, 112, 143, 0.2), rgba(111, 89, 68, 0.08));
+  left: 0;
+  top: 0.55rem;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(124, 112, 143, 0.18), rgba(111, 89, 68, 0.08), transparent);
 }
 
 .reading-section {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(249, 241, 230, 0.64));
+  padding-top: 0.95rem;
 }
 
 .reading-content {

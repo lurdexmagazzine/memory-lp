@@ -302,7 +302,8 @@ function MemoryIndex({
     const frame = window.requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ top: restoreTop, behavior: 'auto' });
       window.requestAnimationFrame(() => {
-        restoreFocusRef.current?.focus({ preventScroll: true });
+        const activeButton = scrollRef.current?.querySelector<HTMLElement>('.memory-list-item.is-active .memory-list-item__body');
+        (activeButton ?? restoreFocusRef.current)?.focus({ preventScroll: true });
         onRestoreComplete();
       });
     });
