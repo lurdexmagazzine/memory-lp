@@ -228,5 +228,81 @@
     "updated_at": "2026-05-29T12:00:00Z",
     "entities": [],
     "source": "holographic"
+  },
+  {
+    "id": "fact-16",
+    "fact_id": 16,
+    "title": "Memory diary source of truth",
+    "content": "The public memory diary should keep growing from Holographic exports and not depend on hand-written content inside the UI.",
+    "category": "project",
+    "tags": [
+      "memory-lp",
+      "holographic",
+      "export"
+    ],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-05-29 06:26:34",
+    "updated_at": "2026-05-29 06:26:34",
+    "entities": [],
+    "source": "holographic"
+  },
+  {
+    "id": "fact-15",
+    "fact_id": 15,
+    "title": "Static-first preference",
+    "content": "Prefer lightweight static front ends and simple hosting when they solve the problem cleanly; avoid heavy local services unless they are clearly needed.",
+    "category": "user_pref",
+    "tags": [
+      "lightweight",
+      "static",
+      "hosting"
+    ],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-05-29 06:26:33",
+    "updated_at": "2026-05-29 06:26:33",
+    "entities": [],
+    "source": "holographic"
+  },
+  {
+    "id": "fact-14",
+    "fact_id": 14,
+    "title": "memory-lp refresh policy",
+    "content": "The memory diary should refresh automatically from the exported Holographic snapshot, with no manual reload button required.",
+    "category": "project",
+    "tags": [
+      "memory-lp",
+      "refresh",
+      "sync"
+    ],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-05-29 06:26:32",
+    "updated_at": "2026-05-29 06:26:32",
+    "entities": [],
+    "source": "holographic"
+  },
+  {
+    "id": "fact-13",
+    "fact_id": 13,
+    "title": "memory-lp mobile interaction",
+    "content": "On phones, selecting a memory must visibly open the reader and never feel like a no-op; the app should provide immediate feedback on tap.",
+    "category": "project",
+    "tags": [
+      "memory-lp",
+      "mobile",
+      "ux"
+    ],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-05-29 06:26:31",
+    "updated_at": "2026-05-29 06:26:31",
+    "entities": [],
+    "source": "holographic"
   }
 ]

@@ -1,8 +1,14 @@
+const MOBILE_QUERY = window.matchMedia('(max-width: 979px)');
+const REFRESH_INTERVAL_MS = 3 * 60 * 1000;
+
 const state = {
   memories: [],
   activeId: null,
   query: '',
   category: 'all',
+  signature: '',
+  refreshing: false,
+  lastSyncedAt: null,
 };
 
 const els = {
@@ -12,12 +18,19 @@ const els = {
   search: document.querySelector('#search'),
   stats: document.querySelector('#stats'),
   heroCount: document.querySelector('#hero-count'),
+  syncStatus: document.querySelector('#sync-status'),
+  backdrop: document.querySelector('#detail-backdrop'),
 };
 
 const dateFmt = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
   month: 'short',
   year: 'numeric',
+});
+
+const timeFmt = new Intl.DateTimeFormat('pt-BR', {
+  hour: '2-digit',
+  minute: '2-digit',
 });
 
 const escapeHTML = (value) =>
@@ -31,7 +44,10 @@ const escapeHTML = (value) =>
 const parseTags = (tags) => {
   if (Array.isArray(tags)) return tags;
   if (!tags) return [];
-  return String(tags).split(',').map((tag) => tag.trim()).filter(Boolean);
+  return String(tags)
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean);
 };
 
 const memoryTitle = (memory) => memory.title || memory.content.split(' :: ')[0].slice(0, 42);
@@ -40,6 +56,21 @@ function formatDate(value) {
   if (!value) return 'sem data';
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : dateFmt.format(parsed);
+}
+
+function formatSyncTime(value) {
+  if (!value) return 'agora';
+  return timeFmt.format(value);
+}
+
+function memorySignature(list) {
+  return JSON.stringify(
+    list.map((item) => [item.id, item.updated_at, item.created_at, item.title, item.category, item.trust]),
+  );
+}
+
+function setSyncStatus(message) {
+  els.syncStatus.textContent = message;
 }
 
 function setStats(list) {
@@ -69,17 +100,13 @@ function buildFilters(list) {
 
 function filteredMemories() {
   const q = state.query.trim().toLowerCase();
+
   return state.memories.filter((memory) => {
     const matchesCategory = state.category === 'all' || memory.category === state.category;
     if (!matchesCategory) return false;
     if (!q) return true;
 
-    const haystack = [
-      memory.title,
-      memory.content,
-      memory.category,
-      ...(parseTags(memory.tags)),
-    ]
+    const haystack = [memory.title, memory.content, memory.category, ...parseTags(memory.tags)]
       .join(' ')
       .toLowerCase();
 
@@ -123,13 +150,24 @@ function renderList(list) {
     .join('');
 }
 
+function closeDetailSheet() {
+  document.body.classList.remove('is-detail-open');
+  els.backdrop.hidden = true;
+}
+
+function openDetailSheet() {
+  if (!MOBILE_QUERY.matches) return;
+  document.body.classList.add('is-detail-open');
+  els.backdrop.hidden = false;
+}
+
 function renderDetail(memory) {
   if (!memory) {
     els.detail.innerHTML = `
       <div class="detail-placeholder">
         <p class="detail-placeholder__eyebrow">Escolhe uma memória</p>
         <h2>Vai aparecer aqui</h2>
-        <p>Selecione uma nota à esquerda para abrir a leitura confortável, com o texto inteiro e os metadados que importam.</p>
+        <p>Selecione uma nota para abrir a leitura confortável, com o texto inteiro e os metadados que importam.</p>
       </div>
     `;
     return;
@@ -139,7 +177,8 @@ function renderDetail(memory) {
   els.detail.innerHTML = `
     <article class="detail">
       <div class="detail__stack">
-        <div class="detail__panel">
+        <div class="detail__panel detail__head">
+          <button class="detail__close" type="button" data-close-detail>Fechar leitura</button>
           <div class="detail__eyebrow">${escapeHTML(memory.category || 'general')} · ${escapeHTML(formatDate(memory.created_at))}</div>
           <h2>${escapeHTML(memoryTitle(memory))}</h2>
           <div class="detail__header">
@@ -167,71 +206,179 @@ function renderDetail(memory) {
   `;
 }
 
-function setActive(id) {
+function renderApp() {
+  const list = filteredMemories();
+  const active = list.find((item) => item.id === state.activeId) || list[0] || null;
+
+  if (active) {
+    state.activeId = active.id;
+  }
+
+  buildFilters(state.memories);
+  setStats(state.memories);
+  renderList(list);
+  renderDetail(active);
+
+  if (!active) {
+    closeDetailSheet();
+  }
+}
+
+function selectMemory(id) {
   state.activeId = id;
-  const memory = state.memories.find((item) => item.id === id) || null;
-  renderDetail(memory);
-  renderList(filteredMemories());
+  renderApp();
+
+  if (MOBILE_QUERY.matches) {
+    openDetailSheet();
+  }
+}
+
+async function loadMemories() {
+  const response = await fetch(`./data/memories.json?v=${Date.now()}`, { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(`Failed to load memories.json (${response.status})`);
+  }
+
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+}
+
+function sortMemories(list) {
+  return [...list].sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+}
+
+function applyMemories(nextMemories) {
+  const normalized = sortMemories(nextMemories);
+  state.memories = normalized;
+  state.signature = memorySignature(normalized);
+
+  if (!state.activeId || !state.memories.some((item) => item.id === state.activeId)) {
+    state.activeId = state.memories[0]?.id || null;
+  }
+
+  renderApp();
+}
+
+async function refreshMemories({ silent = true } = {}) {
+  if (state.refreshing) return;
+  state.refreshing = true;
+
+  try {
+    if (!silent) {
+      setSyncStatus('sincronizando…');
+    }
+
+    const next = await loadMemories();
+    const normalizedNext = sortMemories(next);
+    const nextSignature = memorySignature(normalizedNext);
+    const changed = nextSignature !== state.signature;
+
+    if (changed || !state.memories.length) {
+      applyMemories(normalizedNext);
+      state.lastSyncedAt = new Date();
+      setSyncStatus(`atualizado às ${formatSyncTime(state.lastSyncedAt)}`);
+      return;
+    }
+
+    state.lastSyncedAt = new Date();
+    setSyncStatus(`em dia • ${formatSyncTime(state.lastSyncedAt)}`);
+  } catch (error) {
+    console.error(error);
+    setSyncStatus('falha no sync');
+
+    if (!state.memories.length) {
+      els.list.innerHTML = `
+        <div class="detail-placeholder">
+          <p class="detail-placeholder__eyebrow">Erro ao carregar</p>
+          <h2>Sem snapshot</h2>
+          <p>O site não conseguiu ler <code>data/memories.json</code>. Verifica o deploy e depois volta com menos drama e mais arquivo.</p>
+        </div>
+      `;
+      els.detail.innerHTML = `
+        <div class="detail-placeholder">
+          <p class="detail-placeholder__eyebrow">Erro</p>
+          <h2>Não abriu</h2>
+          <p>${escapeHTML(error.message)}</p>
+        </div>
+      `;
+    }
+  } finally {
+    state.refreshing = false;
+  }
 }
 
 function bindEvents() {
   els.search.addEventListener('input', (event) => {
     state.query = event.target.value;
-    const list = filteredMemories();
-    if (list.length) {
-      state.activeId = list[0].id;
-    }
-    setStats(state.memories);
-    renderList(list);
-    renderDetail(list.find((item) => item.id === state.activeId) || list[0] || null);
+    renderApp();
   });
 
   els.filters.addEventListener('click', (event) => {
     const button = event.target.closest('[data-category]');
     if (!button) return;
+
     state.category = button.dataset.category;
-    const list = filteredMemories();
-    if (list.length) {
-      state.activeId = list[0].id;
-    }
-    buildFilters(state.memories);
-    renderList(list);
-    renderDetail(list.find((item) => item.id === state.activeId) || list[0] || null);
+    renderApp();
   });
 
   els.list.addEventListener('click', (event) => {
     const button = event.target.closest('[data-id]');
     if (!button) return;
-    setActive(button.dataset.id);
-  });
-}
 
-async function loadMemories() {
-  const response = await fetch('./data/memories.json', { cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(`Failed to load memories.json (${response.status})`);
+    selectMemory(button.dataset.id);
+  });
+
+  els.detail.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-close-detail]');
+    if (!button) return;
+
+    closeDetailSheet();
+  });
+
+  els.backdrop.addEventListener('click', closeDetailSheet);
+
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeDetailSheet();
+    }
+  });
+
+  const onViewportChange = (event) => {
+    if (!event.matches) {
+      closeDetailSheet();
+    }
+  };
+
+  if (typeof MOBILE_QUERY.addEventListener === 'function') {
+    MOBILE_QUERY.addEventListener('change', onViewportChange);
+  } else if (typeof MOBILE_QUERY.addListener === 'function') {
+    MOBILE_QUERY.addListener(onViewportChange);
   }
-  const data = await response.json();
-  return Array.isArray(data) ? data : [];
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      refreshMemories({ silent: true });
+    }
+  });
 }
 
 async function init() {
   try {
-    state.memories = (await loadMemories()).sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
-    buildFilters(state.memories);
-    setStats(state.memories);
-    const first = state.memories[0] || null;
-    state.activeId = first?.id || null;
-    renderList(filteredMemories());
-    renderDetail(first);
     bindEvents();
+    setSyncStatus('sincronizando…');
+    await refreshMemories({ silent: false });
+    renderApp();
+
+    window.setInterval(() => {
+      refreshMemories({ silent: true });
+    }, REFRESH_INTERVAL_MS);
   } catch (error) {
     console.error(error);
     els.list.innerHTML = `
       <div class="detail-placeholder">
         <p class="detail-placeholder__eyebrow">Erro ao carregar</p>
         <h2>Sem snapshot</h2>
-        <p>O site não conseguiu ler <code>data/memories.json</code>. Verifica o deploy e depois volta com menos drama e mais arquivo.</p>
+        <p>O site não conseguiu inicializar. Revê o console e o deploy.</p>
       </div>
     `;
     els.detail.innerHTML = `
@@ -241,6 +388,7 @@ async function init() {
         <p>${escapeHTML(error.message)}</p>
       </div>
     `;
+    setSyncStatus('falha no sync');
   }
 }
 
