@@ -141,7 +141,8 @@ type TimelineAnchor = {
 };
 
 function App() {
-  const mobile = useMediaQuery('(max-width: 767.98px)');
+  const desktopShell = useMediaQuery('(min-width: 1024px)');
+  const mobile = !desktopShell;
   const [dataset, setDataset] = useState<MemoryDataset | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
