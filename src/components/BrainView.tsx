@@ -1,39 +1,25 @@
 import type { Entity, MemoryDatasetStats, MemoryEntry, MemoryRelation } from '../types';
 import { CATEGORY_LABELS, IMPORTANCE_LABELS, formatDateLabel } from '../lib/memory';
-import { ChipButton, EmptyState, MetricTile, SectionHeader, StatusPill } from './common';
+import { ChipButton, EmptyState, SectionHeader, StatusPill } from './common';
 
-function countBy<T extends string>(items: T[]): Record<string, number> {
-  return items.reduce<Record<string, number>>((acc, item) => {
-    acc[item] = (acc[item] ?? 0) + 1;
-    return acc;
-  }, {});
-}
-
-function relatedPairs(recordId: string, relations: MemoryRelation[]): MemoryRelation[] {
-  return relations
-    .filter((relation) => relation.fromId === recordId || relation.toId === recordId)
-    .sort((a, b) => b.weight - a.weight);
-}
-
-function relatedRecordIds(recordId: string, relations: MemoryRelation[]): string[] {
-  return relatedPairs(recordId, relations)
-    .map((relation) => (relation.fromId === recordId ? relation.toId : relation.fromId))
-    .filter((value, index, array) => array.indexOf(value) === index);
-}
-
-function relationKindLabel(kind: MemoryRelation['kind']): string {
+function relationLabel(kind: MemoryRelation['kind']): string {
   switch (kind) {
     case 'shared-tag':
-      return 'tag';
+      return 'Tag compartilhada';
     case 'shared-entity':
-      return 'entidade';
+      return 'Entidade compartilhada';
     case 'same-category':
-      return 'categoria';
+      return 'Mesma categoria';
     case 'temporal-neighbor':
-      return 'tempo';
+      return 'Vizinha temporal';
     default:
       return kind;
   }
+}
+
+function counterpartRecord(record: MemoryEntry, relation: MemoryRelation, records: MemoryEntry[]): MemoryEntry | undefined {
+  const counterpartId = relation.fromId === record.id ? relation.toId : relation.fromId;
+  return records.find((item) => item.id === counterpartId);
 }
 
 export function BrainView({
@@ -61,7 +47,7 @@ export function BrainView({
 
   if (!records.length) {
     return (
-      <div className="view-stack">
+      <div className="view-stack brain-view">
         <SectionHeader
           eyebrow="Brain"
           title="Nenhuma memória para mapear"
@@ -70,24 +56,38 @@ export function BrainView({
         <EmptyState
           eyebrow="Vazio"
           title="Sem nós disponíveis"
-          description="Quando houver registros válidos, o mapa relacional aparece aqui com clusters, relações e importância."
+          description="Quando houver registros válidos, o mapa relacional aparece aqui com foco, relações e clusters." 
         />
       </div>
     );
   }
 
-  const activeRelations = focus ? relatedPairs(focus.id, relations) : [];
-  const relatedIds = focus ? relatedRecordIds(focus.id, relations) : [];
-  const relatedRecords = relatedIds
-    .map((id) => records.find((record) => record.id === id))
-    .filter((value): value is MemoryEntry => Boolean(value))
-    .slice(0, 8);
-  const topCategories = Object.entries(countBy(records.map((record) => record.category)))
+  const activeRelations = focus
+    ? relations.filter((relation) => relation.fromId === focus.id || relation.toId === focus.id).slice(0, 6)
+    : [];
+
+  const relatedRecords = activeRelations
+    .map((relation) => (focus ? counterpartRecord(focus, relation, records) : undefined))
+    .filter((value): value is MemoryEntry => Boolean(value));
+
+  const topCategories = Object.entries(
+    records.reduce<Record<string, number>>((accumulator, record) => {
+      accumulator[record.category] = (accumulator[record.category] ?? 0) + 1;
+      return accumulator;
+    }, {}),
+  )
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
-  const topTags = Object.entries(countBy(records.flatMap((record) => record.tags)))
+    .slice(0, 4);
+
+  const topTags = Object.entries(
+    records.flatMap((record) => record.tags).reduce<Record<string, number>>((accumulator, tag) => {
+      accumulator[tag] = (accumulator[tag] ?? 0) + 1;
+      return accumulator;
+    }, {}),
+  )
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8);
+
   const topEntities = entities.filter((entity) => entity.kind !== 'category').slice(0, 8);
 
   return (
@@ -95,101 +95,114 @@ export function BrainView({
       <SectionHeader
         eyebrow="Brain"
         title="Mapa relacional"
-        description="Nós, clusters, relações e importância. Toque em um item para abrir a inspeção."
+        description="Foco, conexões e clusters. Toque em um item para abrir o detalhe contextual."
         action={<StatusPill label={focus ? `${IMPORTANCE_LABELS[focus.importance]} · ${formatDateLabel(focus.createdAtMs)}` : 'Sem foco'} tone="accent" />}
       />
 
-      <div className="brain-metrics">
-        <MetricTile label="Memórias" value={stats.total} note="no recorte atual" tone="accent" />
-        <MetricTile label="Relações" value={stats.relationCount} note="arestas derivadas" tone="calm" />
-        <MetricTile label="Entidades" value={stats.entityCount} note="tags, nomes e categorias" />
-        <MetricTile label="Âncoras" value={stats.importance.anchor} note="registros fortes" />
-      </div>
+      <section className="brain-focus" aria-label="Foco relacional">
+        <div className="brain-focus__primary">
+          <p className="brain-focus__eyebrow">Nó em foco</p>
+          <h3>{focus?.title ?? 'Sem foco'}</h3>
+          <p className="brain-focus__summary">{focus?.summary ?? 'Nenhuma memória selecionada.'}</p>
 
-      <section className="brain-canvas" aria-label="Mapa relacional">
-        <div className="brain-canvas__head">
-          <div>
-            <p className="brain-canvas__eyebrow">Foco atual</p>
-            <h3>{focus?.title ?? 'Sem foco'}</h3>
-            <p className="brain-canvas__meta">{focus ? `${CATEGORY_LABELS[focus.category]} · ${formatDateLabel(focus.createdAtMs)}` : 'Escolha um nó'}</p>
-          </div>
-          <div className="brain-canvas__chips">
-            {focus?.tags.slice(0, 3).map((tag) => (
+          <dl className="brain-focus__meta">
+            <div>
+              <dt>Categoria</dt>
+              <dd>{focus ? CATEGORY_LABELS[focus.category] : '—'}</dd>
+            </div>
+            <div>
+              <dt>Importância</dt>
+              <dd>{focus ? IMPORTANCE_LABELS[focus.importance] : '—'}</dd>
+            </div>
+            <div>
+              <dt>Origem</dt>
+              <dd>{focus?.source ?? '—'}</dd>
+            </div>
+            <div>
+              <dt>Data</dt>
+              <dd>{focus ? formatDateLabel(focus.createdAtMs) : '—'}</dd>
+            </div>
+          </dl>
+
+          <div className="chip-row">
+            {focus?.tags.slice(0, 5).map((tag) => (
               <ChipButton key={tag} active label={tag} onClick={() => onPickTag(tag)} />
             ))}
           </div>
         </div>
 
-        <div className="brain-map" role="list" aria-label="Nodos do cérebro">
-          <button
-            type="button"
-            className="brain-node brain-node--focus"
-            onClick={() => focus && onSelectRecord(focus.id)}
-            aria-pressed="true"
-          >
-            <span className="brain-node__label">{focus?.title ?? 'Foco'}</span>
-            <span className="brain-node__meta">
-              {focus ? `${IMPORTANCE_LABELS[focus.importance]} · ${focus.relationCount} relações` : '—'}
-            </span>
-          </button>
+        <div className="brain-focus__relations">
+          <div className="brain-focus__relations-head">
+            <div>
+              <p className="brain-focus__eyebrow">Conexões próximas</p>
+              <h4>Relações fortes</h4>
+            </div>
+            <StatusPill label={`${activeRelations.length} ligações`} tone="good" />
+          </div>
 
-          {relatedRecords.map((record, index) => {
-            const relation = activeRelations.find((item) => item.fromId === record.id || item.toId === record.id);
-            const angle = (index / Math.max(relatedRecords.length, 1)) * Math.PI * 2;
-            const radius = 37;
-            const x = 50 + Math.cos(angle) * radius;
-            const y = 50 + Math.sin(angle) * radius;
-
-            return (
-              <button
-                key={record.id}
-                type="button"
-                className="brain-node"
-                style={{ left: `${x}%`, top: `${y}%` }}
-                onClick={() => onSelectRecord(record.id)}
-                aria-pressed={record.id === focus?.id}
-              >
-                <span className="brain-node__label">{record.title}</span>
-                <span className="brain-node__meta">
-                  {CATEGORY_LABELS[record.category]} · {relation ? relationKindLabel(relation.kind) : 'nó'}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="brain-map__foot">
-          {focus ? <p>{focus.summary}</p> : null}
+          <div className="brain-relation-stack">
+            {relatedRecords.length ? (
+              relatedRecords.map((record) => {
+                const relation = activeRelations.find((item) => item.fromId === record.id || item.toId === record.id);
+                return (
+                  <button key={record.id} type="button" className="brain-relation-card" onClick={() => onSelectRecord(record.id)}>
+                    <div className="brain-relation-card__head">
+                      <strong>{record.title}</strong>
+                      <span>{relation ? relationLabel(relation.kind) : 'nó'}</span>
+                    </div>
+                    <p>{record.summary}</p>
+                    {relation ? <small>peso {relation.weight.toFixed(1)} · {relation.evidence.join(' · ')}</small> : null}
+                  </button>
+                );
+              })
+            ) : (
+              <EmptyState
+                eyebrow="Conexões"
+                title="Sem relações fortes"
+                description="Esse nó ainda não encontrou vizinhos com força suficiente neste recorte."
+              />
+            )}
+          </div>
         </div>
       </section>
 
-      <section className="cluster-grid" aria-label="Clusters e filtros rápidos">
-        <div className="cluster-card">
+      <section className="brain-clusters" aria-label="Clusters e filtros rápidos">
+        <article className="cluster-card">
           <p className="cluster-card__eyebrow">Categorias</p>
           <div className="cluster-card__chips">
             {topCategories.map(([category, count]) => (
-              <ChipButton key={category} label={`${CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS] ?? category} · ${count}`} onClick={() => onPickCategory(category)} active={focus?.category === category} />
+              <ChipButton
+                key={category}
+                label={`${CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS] ?? category} · ${count}`}
+                onClick={() => onPickCategory(category)}
+                active={focus?.category === category}
+              />
             ))}
           </div>
-        </div>
+        </article>
 
-        <div className="cluster-card">
-          <p className="cluster-card__eyebrow">Tags principais</p>
+        <article className="cluster-card">
+          <p className="cluster-card__eyebrow">Tags centrais</p>
           <div className="cluster-card__chips">
             {topTags.map(([tag, count]) => (
-              <ChipButton key={tag} label={`${tag} · ${count}`} onClick={() => onPickTag(tag)} active={focus?.tags.includes(tag)} />
+              <ChipButton key={tag} label={`${tag} · ${count}`} onClick={() => onPickTag(tag)} active={Boolean(focus?.tags.includes(tag))} />
             ))}
           </div>
-        </div>
+        </article>
 
-        <div className="cluster-card">
+        <article className="cluster-card">
           <p className="cluster-card__eyebrow">Entidades</p>
           <div className="cluster-card__chips">
             {topEntities.map((entity) => (
-              <ChipButton key={entity.id} label={`${entity.label} · ${entity.count}`} onClick={() => onPickEntity(entity.label)} active={focus?.entities.some((item) => item.toLowerCase() === entity.label.toLowerCase())} />
+              <ChipButton
+                key={entity.id}
+                label={`${entity.label} · ${entity.count}`}
+                onClick={() => onPickEntity(entity.label)}
+                active={Boolean(focus?.entities.some((item) => item.toLowerCase() === entity.label.toLowerCase()))}
+              />
             ))}
           </div>
-        </div>
+        </article>
       </section>
     </div>
   );

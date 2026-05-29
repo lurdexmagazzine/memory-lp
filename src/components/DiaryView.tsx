@@ -18,20 +18,12 @@ function groupEntries(entries: DiaryEntry[]): DiaryGroup[] {
   }
 
   return [...map.entries()]
-    .map(([key, groupEntries]) => ({
+    .map(([key, groupedEntries]) => ({
       key,
       label: formatRelativeDate(key),
-      entries: groupEntries,
+      entries: [...groupedEntries].sort((a, b) => (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0)),
     }))
     .sort((a, b) => b.key.localeCompare(a.key));
-}
-
-function groupByDay(entries: DiaryEntry[]): DiaryGroup[] {
-  const groups = groupEntries(entries);
-  return groups.map((group) => ({
-    ...group,
-    entries: [...group.entries].sort((a, b) => (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0)),
-  }));
 }
 
 export function DiaryView({
@@ -52,7 +44,7 @@ export function DiaryView({
   onPickEntity: (value: string) => void;
 }) {
   const focus = records.find((record) => record.id === activeId) ?? records[0] ?? null;
-  const groups = groupByDay(entries);
+  const groups = groupEntries(entries);
 
   if (!entries.length) {
     return (
@@ -65,7 +57,7 @@ export function DiaryView({
         <EmptyState
           eyebrow="Sem resultados"
           title="A timeline está vazia"
-          description="Quando houver registros válidos, eles aparecem aqui em ordem cronológica e com leitura compacta."
+          description="Quando houver registros válidos, eles aparecem aqui em ordem cronológica, com leitura compacta e fácil de escanear."
         />
       </div>
     );
@@ -77,13 +69,13 @@ export function DiaryView({
         eyebrow="Diary"
         title="Timeline cronológica"
         description="Agrupada por data, com leitura compacta e acesso rápido ao inspector."
-        action={focus ? <StatusPill label={`${focus.importance.toUpperCase()} · ${CATEGORY_LABELS[focus.category]}`} tone="good" /> : null}
+        action={focus ? <StatusPill label={`${IMPORTANCE_LABELS[focus.importance]} · ${CATEGORY_LABELS[focus.category]}`} tone="good" /> : null}
       />
 
-      <div className="diary-summary">
+      <div className="diary-quick-actions">
         <ChipButton label="Categoria atual" onClick={() => onPickCategory(focus?.category ?? 'all')} active={Boolean(focus)} />
-        <ChipButton label="Tag principal" onClick={() => focus?.tags[0] ? onPickTag(focus.tags[0]) : undefined} active={Boolean(focus?.tags[0])} />
-        <ChipButton label="Entidade principal" onClick={() => focus?.entities[0] ? onPickEntity(focus.entities[0]) : undefined} active={Boolean(focus?.entities[0])} />
+        <ChipButton label="Tag principal" onClick={() => (focus?.tags[0] ? onPickTag(focus.tags[0]) : undefined)} active={Boolean(focus?.tags[0])} />
+        <ChipButton label="Entidade principal" onClick={() => (focus?.entities[0] ? onPickEntity(focus.entities[0]) : undefined)} active={Boolean(focus?.entities[0])} />
       </div>
 
       <section className="timeline" aria-label="Entradas do diário">

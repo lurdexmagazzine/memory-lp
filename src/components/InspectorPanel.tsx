@@ -1,6 +1,6 @@
 import type { MemoryEntry, MemoryRelation } from '../types';
 import { CATEGORY_LABELS, IMPORTANCE_LABELS, formatDateLabel, formatTimeLabel, paragraphs, recordToInspectorSummary } from '../lib/memory';
-import { ChipButton, EmptyState, SectionHeader, StatusPill } from './common';
+import { ChipButton, EmptyState, StatusPill } from './common';
 
 function relationLabel(kind: MemoryRelation['kind']): string {
   switch (kind) {
@@ -11,7 +11,7 @@ function relationLabel(kind: MemoryRelation['kind']): string {
     case 'same-category':
       return 'Mesma categoria';
     case 'temporal-neighbor':
-      return 'Vizinho temporal';
+      return 'Vizinha temporal';
     default:
       return kind;
   }
@@ -43,6 +43,8 @@ export function InspectorPanel({
   onPickTag: (value: string) => void;
   onPickEntity: (value: string) => void;
 }) {
+  if (!open) return null;
+
   const activeRelations = record
     ? relations
         .filter((relation) => relation.fromId === record.id || relation.toId === record.id)
@@ -50,19 +52,17 @@ export function InspectorPanel({
         .slice(0, 8)
     : [];
 
-  return (
-    <aside className={`inspector-panel ${mobile ? 'inspector-panel--sheet' : 'inspector-panel--dock'} ${open ? 'is-open' : ''}`} aria-label="Inspector de memória">
-      <div className="inspector-panel__header">
-        <SectionHeader
-          eyebrow="Inspector"
-          title={record ? record.title : 'Nenhuma memória selecionada'}
-          description={record ? recordToInspectorSummary(record) : 'Escolha um nó no Brain ou uma entrada do Diary.'}
-        />
-        {mobile ? (
-          <button type="button" className="inspector-panel__close" onClick={onClose}>
-            Fechar
-          </button>
-        ) : null}
+  const panel = (
+    <div className="inspector__panel">
+      <div className="inspector__header">
+        <div>
+          <p className="inspector__eyebrow">Inspector</p>
+          <h2>{record ? record.title : 'Nenhuma memória selecionada'}</h2>
+          <p className="inspector__subtitle">{record ? recordToInspectorSummary(record) : 'Escolha um nó no Brain ou um card do Diary para abrir o detalhe.'}</p>
+        </div>
+        <button type="button" className="toolbar-button toolbar-button--ghost" onClick={onClose}>
+          Fechar
+        </button>
       </div>
 
       {!record ? (
@@ -72,38 +72,38 @@ export function InspectorPanel({
           description="Selecione uma memória para ver conteúdo, metadados, relações, tags e entidades."
         />
       ) : (
-        <div className="inspector-panel__body">
-          <div className="inspector-stats">
-            <div className="inspector-stat">
-              <span className="inspector-stat__label">Categoria</span>
+        <div className="inspector__body">
+          <div className="inspector__stats">
+            <div>
+              <span>Categoria</span>
               <strong>{CATEGORY_LABELS[record.category]}</strong>
             </div>
-            <div className="inspector-stat">
-              <span className="inspector-stat__label">Importância</span>
+            <div>
+              <span>Importância</span>
               <strong>{IMPORTANCE_LABELS[record.importance]}</strong>
             </div>
-            <div className="inspector-stat">
-              <span className="inspector-stat__label">Confiança</span>
+            <div>
+              <span>Confiança</span>
               <strong>{Math.round(record.trust * 100)}%</strong>
             </div>
-            <div className="inspector-stat">
-              <span className="inspector-stat__label">Relações</span>
+            <div>
+              <span>Relações</span>
               <strong>{record.relationCount}</strong>
             </div>
           </div>
 
-          <section className="inspector-section">
-            <p className="inspector-section__eyebrow">Conteúdo</p>
-            <div className="inspector-content">
+          <section className="inspector__section">
+            <p className="inspector__section-label">Conteúdo</p>
+            <div className="inspector__content">
               {paragraphs(record.content).map((paragraph, index) => (
                 <p key={`${record.id}-${index}`}>{paragraph}</p>
               ))}
             </div>
           </section>
 
-          <section className="inspector-section">
-            <p className="inspector-section__eyebrow">Metadados</p>
-            <dl className="inspector-meta">
+          <section className="inspector__section">
+            <p className="inspector__section-label">Metadados</p>
+            <dl className="inspector__meta">
               <div>
                 <dt>Origem</dt>
                 <dd>{record.source}</dd>
@@ -129,8 +129,8 @@ export function InspectorPanel({
             </dl>
           </section>
 
-          <section className="inspector-section">
-            <p className="inspector-section__eyebrow">Tags</p>
+          <section className="inspector__section">
+            <p className="inspector__section-label">Tags</p>
             <div className="chip-row">
               {record.tags.length ? (
                 record.tags.map((tag) => (
@@ -142,8 +142,8 @@ export function InspectorPanel({
             </div>
           </section>
 
-          <section className="inspector-section">
-            <p className="inspector-section__eyebrow">Entidades</p>
+          <section className="inspector__section">
+            <p className="inspector__section-label">Entidades</p>
             <div className="chip-row">
               {record.entities.length ? (
                 record.entities.map((entity) => (
@@ -155,25 +155,25 @@ export function InspectorPanel({
             </div>
           </section>
 
-          <section className="inspector-section">
-            <p className="inspector-section__eyebrow">Relações</p>
+          <section className="inspector__section">
+            <p className="inspector__section-label">Relações</p>
             {activeRelations.length ? (
-              <div className="inspector-relations">
+              <div className="inspector__relations">
                 {activeRelations.map((relation) => {
                   const counterpart = record ? counterpartRecord(record, relation, records) : undefined;
                   return (
                     <button
                       key={`${relation.fromId}-${relation.toId}-${relation.kind}`}
                       type="button"
-                      className="inspector-relation"
+                      className="inspector__relation"
                       onClick={() => counterpart && onSelectRecord(counterpart.id)}
                     >
-                      <div className="inspector-relation__head">
+                      <div className="inspector__relation-head">
                         <strong>{counterpart?.title ?? 'Relacionada'}</strong>
                         <StatusPill label={relationLabel(relation.kind)} tone="good" />
                       </div>
                       <p>{relation.evidence.join(' · ')}</p>
-                      <span className="inspector-relation__weight">peso {relation.weight.toFixed(1)}</span>
+                      <span>peso {relation.weight.toFixed(1)}</span>
                     </button>
                   );
                 })}
@@ -188,6 +188,23 @@ export function InspectorPanel({
           </section>
         </div>
       )}
+    </div>
+  );
+
+  if (mobile) {
+    return (
+      <div className="inspector-sheet" role="presentation">
+        <button type="button" className="inspector-sheet__backdrop" aria-label="Fechar inspector" onClick={onClose} />
+        <aside className="inspector-sheet__panel" role="dialog" aria-modal="true" aria-label="Detalhe da memória">
+          {panel}
+        </aside>
+      </div>
+    );
+  }
+
+  return (
+    <aside className="inspector-rail" aria-label="Detalhe da memória">
+      {panel}
     </aside>
   );
 }

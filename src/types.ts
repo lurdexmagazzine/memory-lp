@@ -14,7 +14,7 @@ export type MemorySource = string;
 export type ImportanceLevel = 'low' | 'medium' | 'high' | 'anchor';
 export type EntityKind = 'tag' | 'entity' | 'category';
 export type MemoryRelationKind = 'shared-tag' | 'shared-entity' | 'same-category' | 'temporal-neighbor';
-export type BrainSurface = 'brain' | 'diary' | 'inspector';
+export type BrainSurface = 'brain' | 'diary';
 export type PeriodFilter = 'all' | '7d' | '30d' | '90d' | '365d';
 
 export interface RawMemoryRecord {

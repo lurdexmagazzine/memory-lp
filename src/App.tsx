@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { BrainSurface, ImportanceLevel, MemoryCategory, MemoryDataset, MemoryFilters, MemoryRelation, MemoryEntry, PeriodFilter } from './types';
+import { useEffect, useMemo, useState } from 'react';
+import type { BrainSurface, ImportanceLevel, MemoryCategory, MemoryDataset, MemoryFilters, MemoryEntry, MemoryRelation, PeriodFilter } from './types';
 import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
   IMPORTANCE_LABELS,
   PERIOD_LABELS,
   buildDiaryEntries,
+  excerpt,
   formatTimeLabel,
   loadMemoryDataset,
   matchesFilters,
@@ -14,7 +15,7 @@ import {
 import { BrainView } from './components/BrainView';
 import { DiaryView } from './components/DiaryView';
 import { EmptyState } from './components/common';
-import { FilterBar } from './components/FilterBar';
+import { FilterDrawer, FilterToolbar } from './components/FilterBar';
 import { InspectorPanel } from './components/InspectorPanel';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { ShellSidebar } from './components/ShellSidebar';
@@ -63,7 +64,11 @@ function labelSource(source: string): string {
   return source === 'holographic' ? 'Holographic' : source;
 }
 
-function syncLabelFromDataset(dataset: MemoryDataset | null, loadState: 'loading' | 'ready' | 'error', errorMessage: string): { label: string; tone: 'neutral' | 'good' | 'warning' | 'danger' | 'accent' } {
+function syncLabelFromDataset(
+  dataset: MemoryDataset | null,
+  loadState: 'loading' | 'ready' | 'error',
+  errorMessage: string,
+): { label: string; tone: 'neutral' | 'good' | 'warning' | 'danger' | 'accent' } {
   if (loadState === 'loading') return { label: 'carregando acervo…', tone: 'accent' };
   if (loadState === 'error') return { label: 'falha no snapshot', tone: 'danger' };
   if (!dataset) return { label: 'sem dados', tone: 'warning' };
@@ -76,6 +81,20 @@ function syncLabelFromDataset(dataset: MemoryDataset | null, loadState: 'loading
   return { label: `sincronizado às ${timeLabel}`, tone: 'good' };
 }
 
+function activeFilterLabels(filters: MemoryFilters): string[] {
+  const labels: string[] = [];
+
+  if (filters.query.trim()) labels.push(`Busca: ${excerpt(filters.query.trim(), 18)}`);
+  if (filters.category !== 'all') labels.push(`Categoria: ${CATEGORY_LABELS[filters.category]}`);
+  if (filters.importance !== 'all') labels.push(`Importância: ${IMPORTANCE_LABELS[filters.importance]}`);
+  if (filters.source !== 'all') labels.push(`Origem: ${labelSource(filters.source)}`);
+  if (filters.period !== 'all') labels.push(`Período: ${PERIOD_LABELS[filters.period]}`);
+  if (filters.entity !== 'all') labels.push(`Entidade: ${filters.entity}`);
+  if (filters.tag !== 'all') labels.push(`Tag: ${filters.tag}`);
+
+  return labels;
+}
+
 function App() {
   const isMobile = useMediaQuery('(max-width: 979px)');
   const [dataset, setDataset] = useState<MemoryDataset | null>(null);
@@ -83,8 +102,10 @@ function App() {
   const [errorMessage, setErrorMessage] = useState('');
   const [filters, setFilters] = useState<MemoryFilters>(DEFAULT_FILTERS);
   const [surface, setSurface] = useState<BrainSurface>('brain');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const previousMainSurface = useRef<Exclude<BrainSurface, 'inspector'>>('brain');
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [inspectedId, setInspectedId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,11 +130,13 @@ function App() {
   }, []);
 
   useEffect(() => {
-    document.body.classList.toggle('is-inspector-open', Boolean(isMobile && surface === 'inspector'));
+    const shouldLockScroll = filtersOpen || (isMobile && mobileInspectorOpen);
+    document.body.classList.toggle('is-inspector-open', shouldLockScroll);
+
     return () => {
       document.body.classList.remove('is-inspector-open');
     };
-  }, [isMobile, surface]);
+  }, [filtersOpen, isMobile, mobileInspectorOpen]);
 
   const visibleRecords = useMemo(() => {
     if (!dataset) return [];
@@ -134,43 +157,43 @@ function App() {
 
   const visibleDiaryEntries = useMemo(() => buildDiaryEntries(visibleRecords), [visibleRecords]);
 
+  const fallbackRecord = useMemo(() => selectFallbackRecord(visibleRecords), [visibleRecords]);
+
+  const focusRecord = useMemo(() => {
+    if (!visibleRecords.length) return null;
+    return visibleRecords.find((record) => record.id === focusedId) ?? fallbackRecord ?? visibleRecords[0];
+  }, [focusedId, fallbackRecord, visibleRecords]);
+
+  const inspectedRecord = useMemo(() => {
+    if (!inspectedId) return null;
+    return visibleRecords.find((record) => record.id === inspectedId) ?? null;
+  }, [inspectedId, visibleRecords]);
+
   useEffect(() => {
     if (!visibleRecords.length) {
-      if (selectedId !== null) {
-        setSelectedId(null);
-      }
+      setFocusedId(null);
+      setInspectedId(null);
+      setMobileInspectorOpen(false);
       return;
     }
 
-    const selectedStillVisible = visibleRecords.some((record) => record.id === selectedId);
-    if (!selectedStillVisible) {
-      setSelectedId(selectFallbackRecord(visibleRecords)?.id ?? visibleRecords[0].id);
+    const focusedStillVisible = focusedId ? visibleRecords.some((record) => record.id === focusedId) : false;
+    if (!focusedStillVisible) {
+      setFocusedId(fallbackRecord?.id ?? visibleRecords[0].id);
     }
-  }, [visibleRecords, selectedId]);
 
-  const selectedRecord = useMemo(() => {
-    if (!visibleRecords.length) return null;
-    return visibleRecords.find((record) => record.id === selectedId) ?? selectFallbackRecord(visibleRecords);
-  }, [visibleRecords, selectedId]);
+    if (inspectedId && !visibleRecords.some((record) => record.id === inspectedId)) {
+      setInspectedId(null);
+      setMobileInspectorOpen(false);
+    }
+  }, [fallbackRecord?.id, focusedId, inspectedId, visibleRecords]);
 
-  const visibleStats = useMemo(() => {
-    return visibleRecords.reduce(
-      (stats, record) => {
-        stats.categories[record.category] = (stats.categories[record.category] ?? 0) + 1;
-        stats.sources[record.source] = (stats.sources[record.source] ?? 0) + 1;
-        stats.importance[record.importance] += 1;
-        return stats;
-      },
-      {
-        total: visibleRecords.length,
-        relationCount: visibleRelations.length,
-        entityCount: visibleEntities.length,
-        categories: {} as Record<string, number>,
-        sources: {} as Record<string, number>,
-        importance: { low: 0, medium: 0, high: 0, anchor: 0 } as Record<ImportanceLevel, number>,
-      },
-    );
-  }, [visibleEntities.length, visibleRecords, visibleRelations.length]);
+  const totalCount = dataset?.records.length ?? 0;
+  const visibleCount = visibleRecords.length;
+  const activeFilterLabelsList = useMemo(() => activeFilterLabels(filters), [filters]);
+  const activeFilterCount = activeFilterLabelsList.length;
+  const syncState = useMemo(() => syncLabelFromDataset(dataset, loadState, errorMessage), [dataset, errorMessage, loadState]);
+  const selectedTitle = focusRecord?.title ?? 'Nenhuma memória selecionada';
 
   const categoryOptions = useMemo(() => {
     if (!dataset) return [{ value: 'all', label: 'Todas', count: 0 }];
@@ -190,7 +213,11 @@ function App() {
     if (!dataset) return [{ value: 'all', label: 'Todas', count: 0 }];
     return [
       { value: 'all', label: 'Todas', count: dataset.records.length },
-      ...(['anchor', 'high', 'medium', 'low'] as ImportanceLevel[]).map((importance) => ({ value: importance, label: IMPORTANCE_LABELS[importance], count: dataset.stats.importance[importance] })),
+      ...(['anchor', 'high', 'medium', 'low'] as ImportanceLevel[]).map((importance) => ({
+        value: importance,
+        label: IMPORTANCE_LABELS[importance],
+        count: dataset.stats.importance[importance],
+      })),
     ];
   }, [dataset]);
 
@@ -237,40 +264,35 @@ function App() {
     ];
   }, [visibleRecords]);
 
-  const syncState = useMemo(() => syncLabelFromDataset(dataset, loadState, errorMessage), [dataset, loadState, errorMessage]);
-
-  const activeView = surface === 'inspector' ? previousMainSurface.current : surface;
-  const inspectorOpen = !isMobile || surface === 'inspector';
-  const totalCount = dataset?.records.length ?? 0;
-  const visibleCount = visibleRecords.length;
-  const selectedTitle = selectedRecord?.title ?? 'Nenhuma memória selecionada';
-
-  function applySurface(next: BrainSurface) {
-    if (next === 'inspector') {
-      if (isMobile) {
-        setSurface((current) => (current === 'inspector' ? previousMainSurface.current : 'inspector'));
-      } else {
-        setSurface('inspector');
-      }
-      return;
-    }
-
-    previousMainSurface.current = next;
+  function handleSurfaceChange(next: BrainSurface) {
     setSurface(next);
+    if (isMobile) {
+      setMobileInspectorOpen(false);
+    }
   }
 
-  function selectRecord(id: string) {
-    const sameRecord = selectedId === id;
-    setSelectedId(id);
-
+  function inspectRecord(id: string) {
+    setFocusedId(id);
+    setInspectedId(id);
     if (isMobile) {
-      if (surface === 'inspector' && sameRecord) {
-        setSurface(previousMainSurface.current);
-      } else {
-        previousMainSurface.current = activeView;
-        setSurface('inspector');
-      }
+      setMobileInspectorOpen(true);
     }
+  }
+
+  function openInspectorForCurrent() {
+    if (!focusRecord) return;
+    setInspectedId(focusRecord.id);
+    if (isMobile) {
+      setMobileInspectorOpen(true);
+    }
+  }
+
+  function closeInspector() {
+    if (isMobile) {
+      setMobileInspectorOpen(false);
+      return;
+    }
+    setInspectedId(null);
   }
 
   function clearFilters() {
@@ -344,16 +366,23 @@ function App() {
       );
     }
 
-    if (activeView === 'brain') {
+    if (surface === 'brain') {
       return (
         <BrainView
           records={visibleRecords}
           entities={visibleEntities}
           relations={visibleRelations}
-          stats={visibleStats}
-          activeId={selectedRecord?.id ?? null}
-          onSelectRecord={selectRecord}
-          onPickCategory={(value) => setCategory(value as MemoryCategory | 'all')}
+          stats={{
+            total: visibleRecords.length,
+            relationCount: visibleRelations.length,
+            entityCount: visibleEntities.length,
+            categories: {},
+            sources: {},
+            importance: { low: 0, medium: 0, high: 0, anchor: 0 },
+          }}
+          activeId={focusRecord?.id ?? null}
+          onSelectRecord={inspectRecord}
+          onPickCategory={(value) => setCategory(value)}
           onPickEntity={(value) => setEntity(value)}
           onPickTag={(value) => setTag(value)}
         />
@@ -364,30 +393,97 @@ function App() {
       <DiaryView
         entries={visibleDiaryEntries}
         records={visibleRecords}
-        activeId={selectedRecord?.id ?? null}
-        onSelectRecord={selectRecord}
-        onPickCategory={(value) => setCategory(value as MemoryCategory | 'all')}
+        activeId={focusRecord?.id ?? null}
+        onSelectRecord={inspectRecord}
+        onPickCategory={(value) => setCategory(value)}
         onPickTag={(value) => setTag(value)}
         onPickEntity={(value) => setEntity(value)}
       />
     );
   })();
 
-  return (
-    <div className="app-shell">
+  const desktopInspectorRecord = !isMobile ? inspectedRecord : null;
+  const mobileInspectorVisible = isMobile && mobileInspectorOpen;
+  const mobileInspectorRecord = mobileInspectorVisible ? inspectedRecord ?? focusRecord : null;
+
+  return isMobile ? (
+    <div className="app-shell app-shell--mobile">
+      <TopBar
+        mobile
+        surface={surface}
+        onSurfaceChange={handleSurfaceChange}
+        query={filters.query}
+        onQueryChange={setQuery}
+        syncLabel={syncState.label}
+        syncTone={syncState.tone}
+        totalCount={totalCount}
+        visibleCount={visibleCount}
+        selectedTitle={selectedTitle}
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={() => setFiltersOpen(true)}
+        onOpenInspector={openInspectorForCurrent}
+        inspectorAvailable={Boolean(focusRecord)}
+        showSwitcher
+      />
+
+      <FilterToolbar activeLabels={activeFilterLabelsList} onOpenFilters={() => setFiltersOpen(true)} onClear={clearFilters} />
+
+      <main className="app-shell__main app-shell__main--mobile" aria-label="Área principal">
+        {mainContent}
+      </main>
+
+      <MobileBottomNav
+        surface={surface}
+        onSurfaceChange={handleSurfaceChange}
+        onOpenInspector={openInspectorForCurrent}
+        inspectorAvailable={Boolean(focusRecord)}
+        inspectorOpen={mobileInspectorVisible}
+      />
+
+      <FilterDrawer
+        open={filtersOpen}
+        mobile
+        filters={filters}
+        categoryOptions={categoryOptions}
+        importanceOptions={importanceOptions}
+        sourceOptions={sourceOptions}
+        periodOptions={periodOptions}
+        entityOptions={entityOptions}
+        tagOptions={tagOptions}
+        onChange={(patch) => setFilters((previous) => ({ ...previous, ...patch }))}
+        onClear={clearFilters}
+        onClose={() => setFiltersOpen(false)}
+      />
+
+      <InspectorPanel
+        record={mobileInspectorRecord}
+        records={visibleRecords}
+        relations={visibleRelations}
+        open={mobileInspectorVisible}
+        mobile
+        onClose={closeInspector}
+        onSelectRecord={inspectRecord}
+        onPickTag={setTag}
+        onPickEntity={setEntity}
+      />
+    </div>
+  ) : (
+    <div className={`app-shell app-shell--desktop ${desktopInspectorRecord ? 'has-inspector' : ''}`}>
       <ShellSidebar
         surface={surface}
-        onSurfaceChange={applySurface}
+        onSurfaceChange={handleSurfaceChange}
         syncLabel={syncState.label}
         totalCount={totalCount}
         visibleCount={visibleCount}
-        relationCount={visibleStats.relationCount}
+        relationCount={visibleRelations.length}
+        selectedTitle={selectedTitle}
       />
 
-      <div className="app-shell__main">
+      <div className="app-shell__workspace">
         <TopBar
+          mobile={false}
           surface={surface}
-          onSurfaceChange={applySurface}
+          onSurfaceChange={handleSurfaceChange}
           query={filters.query}
           onQueryChange={setQuery}
           syncLabel={syncState.label}
@@ -395,42 +491,48 @@ function App() {
           totalCount={totalCount}
           visibleCount={visibleCount}
           selectedTitle={selectedTitle}
+          activeFilterCount={activeFilterCount}
+          onOpenFilters={() => setFiltersOpen(true)}
+          onOpenInspector={openInspectorForCurrent}
+          inspectorAvailable={Boolean(desktopInspectorRecord)}
+          showSwitcher={false}
         />
 
-        <FilterBar
-          filters={filters}
-          categoryOptions={categoryOptions}
-          importanceOptions={importanceOptions}
-          sourceOptions={sourceOptions}
-          periodOptions={periodOptions}
-          entityOptions={entityOptions}
-          tagOptions={tagOptions}
-          onChange={(patch) => setFilters((previous) => ({ ...previous, ...patch }))}
-          onClear={clearFilters}
-        />
+        <FilterToolbar activeLabels={activeFilterLabelsList} onOpenFilters={() => setFiltersOpen(true)} onClear={clearFilters} />
 
-        <main className="workspace" aria-label="Área principal">
+        <main className="workspace-stage" aria-label="Área principal">
           {mainContent}
         </main>
       </div>
 
-      <InspectorPanel
-        record={selectedRecord}
-        records={visibleRecords}
-        relations={visibleRelations}
-        open={inspectorOpen}
-        mobile={isMobile}
-        onClose={() => setSurface(previousMainSurface.current)}
-        onSelectRecord={selectRecord}
-        onPickTag={setTag}
-        onPickEntity={setEntity}
+      <FilterDrawer
+        open={filtersOpen}
+        mobile={false}
+        filters={filters}
+        categoryOptions={categoryOptions}
+        importanceOptions={importanceOptions}
+        sourceOptions={sourceOptions}
+        periodOptions={periodOptions}
+        entityOptions={entityOptions}
+        tagOptions={tagOptions}
+        onChange={(patch) => setFilters((previous) => ({ ...previous, ...patch }))}
+        onClear={clearFilters}
+        onClose={() => setFiltersOpen(false)}
       />
 
-      {isMobile && surface === 'inspector' ? (
-        <button type="button" className="inspector-backdrop" aria-label="Fechar inspector" onClick={() => setSurface(previousMainSurface.current)} />
+      {desktopInspectorRecord ? (
+        <InspectorPanel
+          record={desktopInspectorRecord}
+          records={visibleRecords}
+          relations={visibleRelations}
+          open={Boolean(desktopInspectorRecord)}
+          mobile={false}
+          onClose={closeInspector}
+          onSelectRecord={inspectRecord}
+          onPickTag={setTag}
+          onPickEntity={setEntity}
+        />
       ) : null}
-
-      {isMobile ? <MobileBottomNav value={surface} onChange={applySurface} inspectorLabel="Inspector" /> : null}
     </div>
   );
 }

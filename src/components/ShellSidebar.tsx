@@ -9,6 +9,7 @@ export function ShellSidebar({
   totalCount,
   visibleCount,
   relationCount,
+  selectedTitle,
 }: {
   surface: BrainSurface;
   onSurfaceChange: (value: BrainSurface) => void;
@@ -16,20 +17,21 @@ export function ShellSidebar({
   totalCount: number;
   visibleCount: number;
   relationCount: number;
+  selectedTitle: string;
 }) {
   return (
-    <aside className="shell-sidebar">
+    <aside className="shell-sidebar" aria-label="Visão geral do acervo">
       <div className="shell-sidebar__brand">
-        <p className="shell-sidebar__eyebrow">Lurdex</p>
-        <h2>Memory OS</h2>
-        <p className="shell-sidebar__subtitle">visão de cérebro, diário e inspeção</p>
+        <p className="shell-sidebar__eyebrow">Memory Brain & Diary Viewer</p>
+        <h2>Memory</h2>
+        <p className="shell-sidebar__subtitle">Exploração relacional do acervo da Lurdex.</p>
       </div>
 
-      <ViewSwitcher value={surface} onChange={onSurfaceChange} compact />
+      <ViewSwitcher value={surface} onChange={onSurfaceChange} compact className="shell-sidebar__switcher" />
 
-      <div className="shell-sidebar__metrics">
+      <div className="shell-sidebar__stats">
         <div>
-          <span className="shell-sidebar__metric-label">Totais</span>
+          <span className="shell-sidebar__metric-label">Total</span>
           <strong>{totalCount}</strong>
         </div>
         <div>
@@ -44,11 +46,12 @@ export function ShellSidebar({
 
       <div className="shell-sidebar__status">
         <StatusPill label={syncLabel} tone="accent" />
-        <p>Atualização automática a partir do snapshot exportado.</p>
+        <p>Snapshot validado e pronto para leitura.</p>
       </div>
 
-      <div className="shell-sidebar__note">
-        <p>Use Brain para explorar a malha relacional, Diary para navegar cronologicamente e Inspector para abrir a anatomia de cada memória.</p>
+      <div className="shell-sidebar__selection">
+        <p className="shell-sidebar__selection-label">Foco atual</p>
+        <strong>{selectedTitle}</strong>
       </div>
     </aside>
   );
