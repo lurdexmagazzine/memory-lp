@@ -1,10 +1,10 @@
 :root {
   color-scheme: light;
-  --bg: #f3ede3;
+  --bg: #f4ece1;
   --bg-2: #fbf8f2;
   --surface: rgba(255, 252, 247, 0.94);
   --surface-strong: #fffdf9;
-  --surface-muted: #f0e7d9;
+  --surface-muted: #f2e7da;
   --text: #211f1b;
   --text-soft: #6b655a;
   --text-faint: #8d8477;
@@ -13,6 +13,8 @@
   --accent: #6f5944;
   --accent-strong: #533f30;
   --accent-soft: rgba(111, 89, 68, 0.12);
+  --mauve: #7c708f;
+  --mauve-soft: rgba(124, 112, 143, 0.12);
   --success: #4f7d66;
   --warning: #a17234;
   --danger: #a45863;
@@ -32,7 +34,7 @@
   --space-6: 1.5rem;
   --space-7: 2rem;
   --space-8: 2.75rem;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, 'Times New Roman', serif;
   --index-width: min(100%, 100%);
   --z-header: 40;
@@ -54,9 +56,11 @@ body {
   font-family: var(--font-sans);
   color: var(--text);
   background:
-    radial-gradient(circle at 14% 0%, rgba(111, 89, 68, 0.1), transparent 24%),
-    radial-gradient(circle at 90% 8%, rgba(33, 31, 27, 0.04), transparent 22%),
-    linear-gradient(180deg, #faf6ef, var(--bg));
+    radial-gradient(circle at 14% 0%, rgba(124, 112, 143, 0.11), transparent 24%),
+    radial-gradient(circle at 90% 8%, rgba(33, 31, 27, 0.05), transparent 22%),
+    linear-gradient(180deg, #fcf7ef, var(--bg)),
+    repeating-linear-gradient(0deg, transparent 0 28px, rgba(111, 89, 68, 0.03) 28px 29px),
+    repeating-linear-gradient(90deg, transparent 0 96px, rgba(124, 112, 143, 0.028) 96px 97px);
   overflow: hidden;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -293,10 +297,12 @@ svg {
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(111, 89, 68, 0.11);
   border-radius: 28px;
-  background: rgba(255, 252, 247, 0.94);
-  box-shadow: var(--shadow-md);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.98), rgba(247, 239, 229, 0.94)),
+    var(--surface-strong);
+  box-shadow: 0 24px 64px rgba(28, 24, 18, 0.11);
 }
 
 .index-pane {
@@ -317,7 +323,7 @@ svg {
   border-radius: 0;
   box-shadow: none;
   background:
-    radial-gradient(circle at 10% 0%, rgba(111, 89, 68, 0.12), transparent 24%),
+    radial-gradient(circle at 10% 0%, rgba(124, 112, 143, 0.12), transparent 24%),
     linear-gradient(180deg, rgba(255, 250, 242, 0.98), rgba(244, 236, 224, 0.98));
 }
 
@@ -477,16 +483,44 @@ svg {
 .timeline-stack {
   display: grid;
   gap: 0.8rem;
+  position: relative;
+  padding-left: 0.25rem;
+}
+
+.timeline-stack::before {
+  content: '';
+  position: absolute;
+  left: 0.72rem;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  width: 1px;
+  background: linear-gradient(180deg, rgba(124, 112, 143, 0.28), rgba(111, 89, 68, 0.08));
 }
 
 .day-group {
   display: grid;
   gap: 0.65rem;
-  padding: 0.78rem;
+  padding: 0.82rem 0.82rem 0.78rem 1rem;
   border: 1px solid rgba(111, 89, 68, 0.1);
   border-radius: 22px;
-  background: rgba(255, 249, 240, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 249, 241, 0.92), rgba(250, 242, 231, 0.86)),
+    rgba(255, 249, 240, 0.72);
   box-shadow: 0 10px 26px rgba(28, 24, 18, 0.04);
+  position: relative;
+}
+
+.day-group::before {
+  content: '';
+  position: absolute;
+  left: -0.32rem;
+  top: 1rem;
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 999px;
+  border: 1px solid rgba(124, 112, 143, 0.22);
+  background: linear-gradient(180deg, rgba(255, 250, 244, 0.96), rgba(226, 219, 236, 0.85));
+  box-shadow: 0 8px 18px rgba(124, 112, 143, 0.1);
 }
 
 .day-group__header {
@@ -535,28 +569,32 @@ svg {
   position: relative;
   display: grid;
   gap: 0.26rem;
-  padding: 0.44rem;
+  padding: 0.48rem 0.48rem 0.46rem 0.62rem;
   border-radius: 18px;
   border: 1px solid rgba(33, 31, 27, 0.08);
-  background: rgba(255, 255, 255, 0.84);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(252, 246, 238, 0.92)),
+    rgba(255, 255, 255, 0.84);
   box-shadow: var(--shadow-sm);
 }
 
 .memory-list-item.is-active {
-  border-color: rgba(111, 89, 68, 0.42);
-  background: linear-gradient(180deg, rgba(255, 251, 244, 0.96), rgba(111, 89, 68, 0.08));
-  box-shadow: 0 12px 28px rgba(111, 89, 68, 0.1);
+  border-color: rgba(124, 112, 143, 0.35);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 244, 0.98), rgba(233, 227, 240, 0.86)),
+    rgba(255, 251, 244, 0.96);
+  box-shadow: 0 12px 28px rgba(124, 112, 143, 0.11);
 }
 
 .memory-list-item.is-active::before {
   content: '';
   position: absolute;
-  left: 0.18rem;
+  left: 0;
   top: 0.34rem;
   bottom: 0.34rem;
-  width: 0.18rem;
+  width: 0.2rem;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(111, 89, 68, 0.92), rgba(175, 147, 122, 0.2));
+  background: linear-gradient(180deg, rgba(124, 112, 143, 0.96), rgba(111, 89, 68, 0.18));
 }
 
 .memory-list-item__body {
@@ -648,7 +686,14 @@ svg {
 .reading-header {
   display: grid;
   gap: 0.45rem;
-  padding: 0.15rem 0.05rem;
+  padding: 0.15rem 0.05rem 0.35rem;
+}
+
+.reading-header__mobile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
 }
 
 .reading-header__eyebrow,
@@ -675,10 +720,10 @@ svg {
 .reading-section {
   display: grid;
   gap: 0.75rem;
-  padding: 1rem;
-  border: 1px solid rgba(33, 31, 27, 0.08);
+  padding: 0.95rem 1rem;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.72);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(249, 241, 230, 0.7));
+  position: relative;
 }
 
 .reading-metadata {
@@ -686,7 +731,6 @@ svg {
   flex-wrap: wrap;
   gap: 0.45rem;
   padding: 0;
-  border: 0;
   background: transparent;
 }
 
@@ -696,24 +740,18 @@ svg {
   white-space: nowrap;
 }
 
+.reading-section::before {
+  content: '';
+  position: absolute;
+  left: 0.85rem;
+  top: 0.8rem;
+  bottom: 0.8rem;
+  width: 1px;
+  background: linear-gradient(180deg, rgba(124, 112, 143, 0.2), rgba(111, 89, 68, 0.08));
+}
+
 .reading-section {
-  background: rgba(255, 255, 255, 0.68);
-}
-
-.reading-metadata > div {
-  display: grid;
-  gap: 0.2rem;
-  padding: 0.8rem 0.9rem;
-  border-radius: 18px;
-  background: var(--surface-muted);
-  border: 1px solid rgba(33, 31, 27, 0.06);
-  min-width: 0;
-}
-
-.reading-metadata strong {
-  font-size: 0.98rem;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(249, 241, 230, 0.64));
 }
 
 .reading-content {
@@ -736,7 +774,7 @@ svg {
   padding: 0.85rem;
   border-radius: 18px;
   border: 1px solid rgba(33, 31, 27, 0.08);
-  background: rgba(255, 255, 255, 0.88);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(250, 244, 236, 0.9));
   text-align: left;
   cursor: pointer;
 }
@@ -754,17 +792,59 @@ svg {
   overflow-wrap: anywhere;
 }
 
-.reading-footnote {
-  margin: 0;
+.reading-pane__desktop-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.1rem 0.05rem 0.05rem;
 }
 
-.reading-pane__mobile-bar {
+.reading-pane__nav-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.reading-pane--mobile-fullscreen .reading-header {
   position: sticky;
   top: 0;
-  z-index: 2;
-  padding: 0.35rem 0 0.15rem;
-  background: linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(255, 252, 247, 0.82));
-  backdrop-filter: blur(10px);
+  z-index: 4;
+  padding: 0.7rem 0.75rem 0.8rem;
+  margin: -0.05rem -0.05rem 0;
+  border-radius: 20px;
+  border: 1px solid rgba(111, 89, 68, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(246, 238, 228, 0.96)),
+    rgba(255, 252, 247, 0.96);
+  box-shadow: 0 14px 28px rgba(28, 24, 18, 0.08);
+}
+
+.reading-pane__mobile-nav {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  padding: 0.55rem 0 0.2rem;
+  margin-top: 0.2rem;
+  background: linear-gradient(180deg, rgba(255, 250, 242, 0.78), rgba(244, 236, 224, 0.98));
+}
+
+.reading-pane__mobile-nav .ui-button {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 0.55rem;
+}
+
+.reading-pane__mobile-nav .ui-button--ghost {
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.reading-footnote {
+  margin: 0;
 }
 
 .filter-sheet {
@@ -779,7 +859,6 @@ svg {
   position: absolute;
   inset: 0;
   background: rgba(28, 24, 18, 0.34);
-  backdrop-filter: blur(8px);
 }
 
 .sheet__panel {

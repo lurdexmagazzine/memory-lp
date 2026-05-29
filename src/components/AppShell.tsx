@@ -408,17 +408,33 @@ function ReadingPane({
   mobile,
   onBack,
   onSelectRecord,
+  pageLabel,
+  hasPrevious,
+  hasNext,
+  onPrevious,
+  onNext,
 }: {
   record: MemoryEntry | null;
   related: Array<{ record: MemoryEntry; relation: MemoryRelation }>;
   mobile: boolean;
   onBack: () => void;
   onSelectRecord: (id: string) => void;
+  pageLabel: string;
+  hasPrevious: boolean;
+  hasNext: boolean;
+  onPrevious: () => void;
+  onNext: () => void;
 }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [record?.id]);
+
   if (!record) {
     return (
       <section className={cx('reading-pane', mobile && 'reading-pane--mobile-fullscreen')} aria-label="Leitura da memória">
-        <div className="reading-pane__scroll">
+        <div className="reading-pane__scroll" ref={scrollRef}>
           <EmptyState
             eyebrow="Leitura"
             title="Selecione uma memória"
@@ -432,17 +448,28 @@ function ReadingPane({
 
   return (
     <section className={cx('reading-pane', mobile && 'reading-pane--mobile-fullscreen')} aria-label={`Leitura de ${record.title}`}>
-      <div className="reading-pane__scroll">
-        {mobile ? (
-          <div className="reading-pane__mobile-bar">
-            <button type="button" className="ui-button ui-button--ghost" onClick={onBack}>
-              Voltar
-            </button>
-            <StatusPill label={CATEGORY_LABELS[record.category]} tone="accent" />
+      <div className="reading-pane__scroll" ref={scrollRef}>
+        {!mobile ? (
+          <div className="reading-pane__desktop-nav" aria-label="Navegação da leitura">
+            <StatusPill label={pageLabel} tone="neutral" />
+            <div className="reading-pane__nav-actions">
+              <button type="button" className="ui-button ui-button--ghost" onClick={onPrevious} disabled={!hasPrevious}>
+                Anterior
+              </button>
+              <button type="button" className="ui-button ui-button--ghost" onClick={onNext} disabled={!hasNext}>
+                Próxima
+              </button>
+            </div>
           </div>
         ) : null}
 
         <header className="reading-header">
+          {mobile ? (
+            <div className="reading-header__mobile-meta">
+              <StatusPill label={pageLabel} tone="neutral" />
+              <StatusPill label={CATEGORY_LABELS[record.category]} tone="accent" />
+            </div>
+          ) : null}
           <p className="reading-header__eyebrow">Leitura</p>
           <h2>{record.title}</h2>
           <p className="reading-header__summary">{record.summary}</p>
@@ -473,6 +500,20 @@ function ReadingPane({
           <p className="reading-section__eyebrow">Resumo de leitura</p>
           <p className="reading-footnote">{recordToInspectorSummary(record)}</p>
         </section>
+
+        {mobile ? (
+          <div className="reading-pane__mobile-nav" aria-label="Navegação da leitura">
+            <button type="button" className="ui-button ui-button--ghost" onClick={onBack}>
+              Voltar
+            </button>
+            <button type="button" className="ui-button ui-button--ghost" onClick={onPrevious} disabled={!hasPrevious}>
+              Anterior
+            </button>
+            <button type="button" className="ui-button ui-button--ghost" onClick={onNext} disabled={!hasNext}>
+              Próxima
+            </button>
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -680,6 +721,20 @@ function NotebookLayout({
   const indexVisible = !compact || mobileView === 'index';
   const readingVisible = !compact || mobileView === 'reading';
   const resultLabelText = `${visibleCount} de ${totalCount}`;
+  const timelineEntries = useMemo(() => timelineGroups.flatMap((group) => group.entries), [timelineGroups]);
+  const selectedIndex = useMemo(
+    () => (selectedRecord ? timelineEntries.findIndex((entry) => entry.memoryId === selectedRecord.id) : -1),
+    [selectedRecord, timelineEntries],
+  );
+  const pageLabel = selectedIndex >= 0 ? `Página ${selectedIndex + 1} de ${timelineEntries.length}` : 'Página —';
+  const previousEntry = selectedIndex > 0 ? timelineEntries[selectedIndex - 1] : null;
+  const nextEntry = selectedIndex >= 0 && selectedIndex < timelineEntries.length - 1 ? timelineEntries[selectedIndex + 1] : null;
+  const goPrevious = () => {
+    if (previousEntry) onSelectRecord(previousEntry.memoryId);
+  };
+  const goNext = () => {
+    if (nextEntry) onSelectRecord(nextEntry.memoryId);
+  };
 
   return (
     <div className={cx('notebook-layout', compact && 'notebook-layout--compact')}>
@@ -715,6 +770,11 @@ function NotebookLayout({
           mobile={compact}
           onBack={onBackToIndex}
           onSelectRecord={onSelectRecord}
+          pageLabel={pageLabel}
+          hasPrevious={Boolean(previousEntry)}
+          hasNext={Boolean(nextEntry)}
+          onPrevious={goPrevious}
+          onNext={goNext}
         />
       ) : null}
 
