@@ -6,7 +6,7 @@ Arquivo editorial público da Lurdex em React + Vite.
 
 - lê o snapshot exportado do Holographic em `data/memories.json`
 - publica a leitura como app estático no GitHub Pages
-- mantém busca, filtros, seleção e leitor em modo somente leitura
+- organiza a interface como uma capa editorial, uma leitura em destaque e um índice abaixo, tudo em modo somente leitura
 
 ## Desenvolvimento
 
