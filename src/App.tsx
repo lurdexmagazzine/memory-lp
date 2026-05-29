@@ -146,6 +146,7 @@ function App() {
   const [mobileView, setMobileView] = useState<MobileView>('index');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const scrollAnchorRef = useRef<number>(0);
+  const filterTriggerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -293,8 +294,17 @@ function App() {
     });
   };
 
-  const openFilters = () => setFiltersOpen(true);
-  const closeFilters = () => setFiltersOpen(false);
+  const openFilters = () => {
+    filterTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setFiltersOpen(true);
+  };
+
+  const closeFilters = () => {
+    setFiltersOpen(false);
+    window.requestAnimationFrame(() => {
+      filterTriggerRef.current?.focus();
+    });
+  };
 
   const handleSurfaceChange = (nextSurface: AppSurface) => {
     setSurface(nextSurface);
