@@ -134,6 +134,12 @@ function buildFilterSummary(filters: MemoryFilters): string[] {
 
 type MobileView = 'index' | 'reading';
 
+type TimelineAnchor = {
+  id: string;
+  scrollTop: number;
+  itemTop: number;
+};
+
 function App() {
   const mobile = useMediaQuery('(max-width: 767.98px)');
   const [dataset, setDataset] = useState<MemoryDataset | null>(null);
@@ -146,6 +152,7 @@ function App() {
   const [mobileView, setMobileView] = useState<MobileView>('index');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const timelineScrollTopRef = useRef(0);
+  const [timelineRestoreAnchor, setTimelineRestoreAnchor] = useState<TimelineAnchor | null>(null);
   const timelineRestorePendingRef = useRef(false);
   const indexScrollContainerRef = useRef<HTMLDivElement>(null);
   const filterTriggerRef = useRef<HTMLElement | null>(null);
@@ -219,7 +226,7 @@ function App() {
 
   const relatedRecords = useMemo(() => {
     if (!selectedRecord) return [] as Array<{ record: MemoryEntry; relation: MemoryRelation }>;
-    return getRelatedRecords(selectedRecord.id, visibleRelations, visibleRecords, 6);
+    return getRelatedRecords(selectedRecord.id, visibleRelations, visibleRecords, 3);
   }, [selectedRecord, visibleRelations, visibleRecords]);
 
   useEffect(() => {
@@ -246,7 +253,7 @@ function App() {
   const visibleCount = visibleRecords.length;
   const activeFilterSummary = useMemo(() => buildFilterSummary(filters), [filters]);
   const activeFilterCount = activeFilterSummary.length;
-  const mobileTimelineRestoreTop = mobile && mobileView === 'index' && timelineRestorePendingRef.current ? timelineScrollTopRef.current : null;
+  const mobileTimelineRestoreAnchor = mobile && mobileView === 'index' ? timelineRestoreAnchor : null;
   const syncTone: PillTone =
     status === 'error'
       ? 'danger'
@@ -284,14 +291,20 @@ function App() {
     setFilters(DEFAULT_FILTERS);
   };
 
-  const rememberMobileTimelinePosition = () => {
+  const rememberMobileTimelinePosition = (anchor: TimelineAnchor) => {
     if (!mobile || mobileView !== 'index') return;
-    timelineScrollTopRef.current = indexScrollContainerRef.current?.scrollTop ?? 0;
+    timelineScrollTopRef.current = anchor.scrollTop;
+    setTimelineRestoreAnchor(anchor);
     timelineRestorePendingRef.current = true;
   };
 
   const handleTimelineRestoreComplete = () => {
     timelineRestorePendingRef.current = false;
+    setTimelineRestoreAnchor(null);
+  };
+
+  const handleTimelineScroll = (scrollTop: number) => {
+    timelineScrollTopRef.current = scrollTop;
   };
 
   const openRecord = (id: string) => {
@@ -300,8 +313,9 @@ function App() {
     setSelectedId(id);
 
     if (mobile) {
-      if (!wasMobileReading && !timelineRestorePendingRef.current) {
-        rememberMobileTimelinePosition();
+      if (!wasMobileReading) {
+        timelineScrollTopRef.current = indexScrollContainerRef.current?.scrollTop ?? timelineScrollTopRef.current;
+        timelineRestorePendingRef.current = true;
       }
       setMobileView('reading');
     }
@@ -362,9 +376,10 @@ function App() {
       relatedRecords={relatedRecords}
       mobileView={mobileView}
       indexScrollRef={indexScrollContainerRef}
-      mobileTimelineRestoreTop={mobileTimelineRestoreTop}
+      mobileTimelineRestoreAnchor={mobileTimelineRestoreAnchor}
       restoreFocusRef={readingReturnFocusRef}
       filtersOpen={filtersOpen}
+      onTimelineScroll={handleTimelineScroll}
       onRememberTimelinePosition={rememberMobileTimelinePosition}
       onTimelineRestoreComplete={handleTimelineRestoreComplete}
       onSelectRecord={openRecord}

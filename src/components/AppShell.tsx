@@ -9,7 +9,6 @@ import {
   formatShortDateLabel,
   formatTimeLabel,
   paragraphs,
-  recordToInspectorSummary,
 } from '../lib/memory';
 import { ChipButton, EmptyState, StatusPill, cx } from './common';
 import type { PillTone } from './common';
@@ -31,6 +30,16 @@ function relationLabel(kind: MemoryRelation['kind']): string {
 
 function sourceLabel(source: string): string {
   return source === 'holographic' ? 'Holographic' : source;
+}
+
+type TimelineAnchor = {
+  id: string;
+  scrollTop: number;
+  itemTop: number;
+};
+
+function escapeAttributeValue(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
 function compactTags(tags: string[], maxVisible = 2): { visible: string[]; hidden: number } {
@@ -102,7 +111,7 @@ function IndexToolbar({
     <header className={cx('index-toolbar', compact && 'index-toolbar--compact')}>
       <div className="index-toolbar__top">
         <div className="index-toolbar__brand">
-          <h1>Memory</h1>
+          <h1>Diário</h1>
           <StatusPill label={syncLabel} tone={syncTone} />
         </div>
         <p className="index-toolbar__count">{resultLabelText}</p>
@@ -137,18 +146,20 @@ function IndexToolbar({
   );
 }
 
-function MemoryListItem({
+function FragmentItem({
   record,
   active,
+  compact,
   onSelect,
   onPickTag,
   onBeforeSelect,
 }: {
   record: MemoryEntry;
   active: boolean;
+  compact: boolean;
   onSelect: () => void;
   onPickTag: (value: string) => void;
-  onBeforeSelect: () => void;
+  onBeforeSelect: (node: HTMLElement) => void;
 }) {
   const tags = compactTags(record.tags, 2);
 
@@ -157,13 +168,22 @@ function MemoryListItem({
       <button
         type="button"
         className="memory-list-item__body"
-        onPointerDown={onBeforeSelect}
-        onClick={onSelect}
+        data-memory-id={record.id}
+        onPointerDown={(event) => {
+          if (compact) event.preventDefault();
+          onBeforeSelect(event.currentTarget);
+        }}
+        onClick={(event) => {
+          if (compact) event.currentTarget.blur();
+          onBeforeSelect(event.currentTarget);
+          onSelect();
+        }}
         aria-current={active ? 'true' : undefined}
       >
         <div className="memory-list-item__top">
-          <span className="memory-list-item__date">{formatShortDateLabel(record.createdAtMs)}</span>
-          <span className="memory-list-item__source">{sourceLabel(record.source)}</span>
+          <span className="memory-list-item__date">
+            {formatShortDateLabel(record.createdAtMs)} · {sourceLabel(record.source)}
+          </span>
         </div>
 
         <h3 className="memory-list-item__title">{record.title}</h3>
@@ -185,18 +205,20 @@ function MemoryListItem({
   );
 }
 
-function DayGroup({
+function ChapterGroup({
   group,
   selectedId,
   onSelectRecord,
   onPickTag,
   onBeforeSelectRecord,
+  compact,
 }: {
   group: DiaryGroup;
   selectedId: string | null;
   onSelectRecord: (id: string) => void;
   onPickTag: (value: string) => void;
-  onBeforeSelectRecord: () => void;
+  onBeforeSelectRecord: (node: HTMLElement) => void;
+  compact: boolean;
 }) {
   const totalEntries = group.entries.length;
 
@@ -212,7 +234,7 @@ function DayGroup({
 
       <div className="day-group__list">
         {group.entries.map((entry) => (
-          <MemoryListItem
+          <FragmentItem
             key={entry.id}
             record={{
               id: entry.memoryId,
@@ -236,6 +258,7 @@ function DayGroup({
               summary: entry.excerpt,
               searchText: '',
             }}
+            compact={compact}
             active={entry.memoryId === selectedId}
             onSelect={() => onSelectRecord(entry.memoryId)}
             onPickTag={onPickTag}
@@ -247,7 +270,7 @@ function DayGroup({
   );
 }
 
-function MemoryIndex({
+function DiaryIndex({
   query,
   onQueryChange,
   onOpenFilters,
@@ -264,10 +287,13 @@ function MemoryIndex({
   onSelectRecord,
   onPickTag,
   scrollRef,
-  onBeforeSelectRecord,
-  restoreScrollTop,
+  onScroll,
+  onCaptureTimelineAnchor,
+  restoreAnchor,
   restoreFocusRef,
   onRestoreComplete,
+  className,
+  ariaHidden,
 }: {
   query: string;
   onQueryChange: (value: string) => void;
@@ -285,34 +311,72 @@ function MemoryIndex({
   onSelectRecord: (id: string) => void;
   onPickTag: (value: string) => void;
   scrollRef: RefObject<HTMLDivElement>;
-  onBeforeSelectRecord: () => void;
-  restoreScrollTop: number | null;
+  onScroll: (scrollTop: number) => void;
+  onCaptureTimelineAnchor: (anchor: TimelineAnchor) => void;
+  restoreAnchor: TimelineAnchor | null;
   restoreFocusRef: RefObject<HTMLElement | null>;
   onRestoreComplete: () => void;
+  className?: string;
+  ariaHidden?: boolean;
 }) {
+  const captureAnchorFromNode = (node: HTMLElement) => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const id = node.dataset.memoryId;
+    if (!id) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const nodeRect = node.getBoundingClientRect();
+    onCaptureTimelineAnchor({
+      id,
+      scrollTop: container.scrollTop,
+      itemTop: nodeRect.top - containerRect.top,
+    });
+  };
+
   useEffect(() => {
-    if (!compact || !selectedId || restoreScrollTop !== null) return;
+    if (compact || !selectedId || restoreAnchor) return;
     const activeButton = scrollRef.current?.querySelector<HTMLElement>('.memory-list-item.is-active .memory-list-item__body');
     activeButton?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [compact, restoreScrollTop, selectedId, timelineGroups.length]);
+  }, [compact, restoreAnchor, selectedId, timelineGroups.length]);
 
   useEffect(() => {
-    if (!compact || restoreScrollTop === null || !scrollRef.current) return;
-    const restoreTop = restoreScrollTop;
-    const frame = window.requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ top: restoreTop, behavior: 'auto' });
-      window.requestAnimationFrame(() => {
-        const activeButton = scrollRef.current?.querySelector<HTMLElement>('.memory-list-item.is-active .memory-list-item__body');
-        (activeButton ?? restoreFocusRef.current)?.focus({ preventScroll: true });
-        onRestoreComplete();
-      });
-    });
+    if (!compact || !restoreAnchor || !scrollRef.current) return;
+    const container = scrollRef.current;
+    const target = container.querySelector<HTMLElement>(`[data-memory-id="${escapeAttributeValue(restoreAnchor.id)}"]`);
 
-    return () => window.cancelAnimationFrame(frame);
-  }, [compact, onRestoreComplete, restoreFocusRef, restoreScrollTop, scrollRef]);
+    if (!target) {
+      restoreFocusRef.current?.focus({ preventScroll: true });
+      onRestoreComplete();
+      return;
+    }
+
+    const applyRestore = () => {
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const currentTop = targetRect.top - containerRect.top;
+      container.scrollTop = restoreAnchor.scrollTop + (currentTop - restoreAnchor.itemTop);
+      target.focus({ preventScroll: true });
+    };
+
+    applyRestore();
+    const frame = window.requestAnimationFrame(applyRestore);
+    const timerA = window.setTimeout(applyRestore, 50);
+    const timerB = window.setTimeout(() => {
+      applyRestore();
+      onRestoreComplete();
+    }, 150);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timerA);
+      window.clearTimeout(timerB);
+    };
+  }, [compact, onRestoreComplete, restoreAnchor, restoreFocusRef, scrollRef]);
 
   return (
-    <section className={cx('index-pane', compact && 'index-pane--compact')} aria-label="Índice de memórias">
+    <section className={cx('index-pane', compact && 'index-pane--compact', className)} aria-label="Índice de memórias" aria-hidden={ariaHidden ? 'true' : undefined}>
       <IndexToolbar
         query={query}
         onQueryChange={onQueryChange}
@@ -327,24 +391,30 @@ function MemoryIndex({
         compact={compact}
       />
 
-      <div ref={scrollRef} className="index-pane__scroll">
+      <div
+        ref={scrollRef}
+        className="index-pane__scroll"
+        tabIndex={-1}
+        onScroll={(event) => onScroll(event.currentTarget.scrollTop)}
+      >
         {timelineGroups.length ? (
           <section className="timeline-stack" aria-label="Timeline do diário e das memórias">
             {timelineGroups.map((group) => (
-              <DayGroup
+              <ChapterGroup
                 key={group.key}
                 group={group}
                 selectedId={selectedId}
                 onSelectRecord={onSelectRecord}
                 onPickTag={onPickTag}
-                onBeforeSelectRecord={onBeforeSelectRecord}
+                onBeforeSelectRecord={captureAnchorFromNode}
+                compact={compact}
               />
             ))}
           </section>
         ) : (
           <EmptyState
-            eyebrow="Índice"
-            title="Nenhuma entrada no recorte atual"
+            eyebrow="Índice do diário"
+            title="Nenhum fragmento no recorte atual"
             description="A timeline aparece quando a busca ou os filtros encontram memórias datadas."
           />
         )}
@@ -353,21 +423,25 @@ function MemoryIndex({
   );
 }
 
-function ReadingMetadata({ record }: { record: MemoryEntry }) {
+function MemoryMarks({ record, pageLabel }: { record: MemoryEntry; pageLabel: string }) {
   return (
-    <section className="reading-metadata" aria-label="Metadados da memória">
-      <StatusPill label={`Data · ${formatDateLabel(record.createdAtMs)} · ${formatTimeLabel(record.createdAtMs)}`} tone="neutral" />
-      <StatusPill label={`Categoria · ${CATEGORY_LABELS[record.category]}`} tone="accent" />
-      <StatusPill label={`Origem · ${sourceLabel(record.source)}`} tone="neutral" />
-      <StatusPill
-        label={`Importância · ${IMPORTANCE_LABELS[record.importance]}`}
-        tone={record.importance === 'anchor' || record.importance === 'high' ? 'warning' : 'good'}
-      />
+    <section className="reading-section" aria-label="Marcas da memória">
+      <p className="reading-section__eyebrow">Marcas</p>
+      <div className="reading-metadata">
+        <StatusPill label={`Página · ${pageLabel}`} tone="neutral" />
+        <StatusPill label={`Data · ${formatDateLabel(record.createdAtMs)} · ${formatTimeLabel(record.createdAtMs)}`} tone="neutral" />
+        <StatusPill label={`Categoria · ${CATEGORY_LABELS[record.category]}`} tone="accent" />
+        <StatusPill label={`Origem · ${sourceLabel(record.source)}`} tone="neutral" />
+        <StatusPill
+          label={`Importância · ${IMPORTANCE_LABELS[record.importance]}`}
+          tone={record.importance === 'anchor' || record.importance === 'high' ? 'warning' : 'good'}
+        />
+      </div>
     </section>
   );
 }
 
-function RelatedMemories({
+function RelatedEchoes({
   items,
   onSelect,
 }: {
@@ -378,8 +452,8 @@ function RelatedMemories({
     return (
       <EmptyState
         eyebrow="Ecos relacionados"
-        title="Sem relações fortes"
-        description="Quando houver relações confiáveis, elas aparecem aqui como apoio à leitura."
+        title="Sem ecos ainda"
+        description="Quando surgirem relações confiáveis, elas aparecem aqui como pequenos apoios à leitura."
       />
     );
   }
@@ -403,7 +477,7 @@ function RelatedMemories({
   );
 }
 
-function ReadingPane({
+function ReadingPage({
   record,
   related,
   mobile,
@@ -427,10 +501,29 @@ function ReadingPane({
   onNext: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const mobileBackRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
   }, [record?.id]);
+
+  useEffect(() => {
+    if (!mobile || !record) return;
+    mobileBackRef.current?.focus({ preventScroll: true });
+  }, [mobile, record?.id]);
+
+  useEffect(() => {
+    if (!mobile || !record) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onBack();
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [mobile, onBack, record?.id]);
 
   if (!record) {
     return (
@@ -476,7 +569,7 @@ function ReadingPane({
           <p className="reading-header__summary">{record.summary}</p>
         </header>
 
-        <ReadingMetadata record={record} />
+        <MemoryMarks record={record} pageLabel={pageLabel} />
 
         <section className="reading-section">
           <p className="reading-section__eyebrow">Anotação</p>
@@ -495,26 +588,21 @@ function ReadingPane({
           </div>
         </section>
 
-        <RelatedMemories items={related} onSelect={onSelectRecord} />
+        <RelatedEchoes items={related} onSelect={onSelectRecord} />
 
-        <section className="reading-section">
-          <p className="reading-section__eyebrow">Resumo de leitura</p>
-          <p className="reading-footnote">{recordToInspectorSummary(record)}</p>
-        </section>
-
-        {mobile ? (
-          <div className="reading-pane__mobile-nav" aria-label="Navegação da leitura">
-            <button type="button" className="ui-button ui-button--ghost" onClick={onBack}>
-              Voltar
-            </button>
-            <button type="button" className="ui-button ui-button--ghost" onClick={onPrevious} disabled={!hasPrevious}>
-              Anterior
-            </button>
-            <button type="button" className="ui-button ui-button--ghost" onClick={onNext} disabled={!hasNext}>
-              Próxima
-            </button>
-          </div>
-        ) : null}
+          {mobile ? (
+            <div className="reading-pane__mobile-nav" aria-label="Navegação da leitura">
+              <button ref={mobileBackRef} type="button" className="ui-button ui-button--ghost" onClick={onBack}>
+                Voltar
+              </button>
+              <button type="button" className="ui-button ui-button--ghost" onClick={onPrevious} disabled={!hasPrevious}>
+                Anterior
+              </button>
+              <button type="button" className="ui-button ui-button--ghost" onClick={onNext} disabled={!hasNext}>
+                Próxima
+              </button>
+            </div>
+          ) : null}
       </div>
     </section>
   );
@@ -673,10 +761,11 @@ export interface AppShellProps {
   relatedRecords: Array<{ record: MemoryEntry; relation: MemoryRelation }>;
   mobileView: 'index' | 'reading';
   indexScrollRef: RefObject<HTMLDivElement>;
-  mobileTimelineRestoreTop: number | null;
+  mobileTimelineRestoreAnchor: TimelineAnchor | null;
   restoreFocusRef: RefObject<HTMLElement | null>;
   filtersOpen: boolean;
-  onRememberTimelinePosition: () => void;
+  onTimelineScroll: (scrollTop: number) => void;
+  onRememberTimelinePosition: (anchor: TimelineAnchor) => void;
   onTimelineRestoreComplete: () => void;
   onSelectRecord: (id: string) => void;
   onBackToIndex: () => void;
@@ -688,7 +777,7 @@ export interface AppShellProps {
   onCloseFilters: () => void;
 }
 
-function NotebookLayout({
+function DiaryLayout({
   compact,
   surface,
   onSurfaceChange,
@@ -705,7 +794,7 @@ function NotebookLayout({
   relatedRecords,
   mobileView,
   indexScrollRef,
-  mobileTimelineRestoreTop,
+  mobileTimelineRestoreAnchor,
   restoreFocusRef,
   onRememberTimelinePosition,
   onTimelineRestoreComplete,
@@ -718,10 +807,11 @@ function NotebookLayout({
   onOpenFilters,
   onCloseFilters,
   filtersOpen,
+  onTimelineScroll,
 }: AppShellProps) {
-  const indexVisible = !compact || mobileView === 'index';
+  const indexVisible = true;
   const readingVisible = !compact || mobileView === 'reading';
-  const resultLabelText = `${visibleCount} de ${totalCount}`;
+  const resultLabelText = `Fragmentos · ${visibleCount} de ${totalCount}`;
   const timelineEntries = useMemo(() => timelineGroups.flatMap((group) => group.entries), [timelineGroups]);
   const selectedIndex = useMemo(
     () => (selectedRecord ? timelineEntries.findIndex((entry) => entry.memoryId === selectedRecord.id) : -1),
@@ -740,7 +830,7 @@ function NotebookLayout({
   return (
     <div className={cx('notebook-layout', compact && 'notebook-layout--compact')}>
       {indexVisible ? (
-        <MemoryIndex
+        <DiaryIndex
           query={filters.query}
           onQueryChange={onQueryChange}
           onOpenFilters={onOpenFilters}
@@ -752,20 +842,23 @@ function NotebookLayout({
           syncLabel={syncLabel}
           syncTone={syncTone}
           compact={compact}
+          className={compact && mobileView === 'reading' ? 'index-pane--underlay' : undefined}
+          ariaHidden={compact && mobileView === 'reading'}
           timelineGroups={timelineGroups}
           selectedId={selectedRecord?.id ?? null}
           onSelectRecord={onSelectRecord}
           onPickTag={(value) => onToggleFilter('tag', value)}
           scrollRef={indexScrollRef}
-          onBeforeSelectRecord={onRememberTimelinePosition}
-          restoreScrollTop={mobileTimelineRestoreTop}
+          onScroll={onTimelineScroll}
+          onCaptureTimelineAnchor={onRememberTimelinePosition}
+          restoreAnchor={mobileTimelineRestoreAnchor}
           restoreFocusRef={restoreFocusRef}
           onRestoreComplete={onTimelineRestoreComplete}
         />
       ) : null}
 
       {readingVisible ? (
-        <ReadingPane
+        <ReadingPage
           record={selectedRecord}
           related={relatedRecords}
           mobile={compact}
@@ -795,7 +888,7 @@ function NotebookLayout({
 export function AppShell(props: AppShellProps) {
   return (
     <div className={cx('notebook-shell', props.compact && 'notebook-shell--compact')}>
-      <NotebookLayout {...props} />
+      <DiaryLayout {...props} />
     </div>
   );
 }
