@@ -186,10 +186,16 @@ function FragmentItem({
         />
         <article
           className={cn(
-            'ml-3 border-l border-[color:var(--mauve-soft)] bg-transparent px-4 py-3 shadow-none transition-all',
+            'memory-list-item__body--mobile ml-3 border-l border-[color:var(--mauve-soft)] bg-transparent px-4 py-3 shadow-none transition-all',
             active ? 'rounded-[1.35rem] border border-border/60 bg-[color:var(--surface)]/94 px-4 py-4 shadow-[0_10px_24px_rgba(28,24,18,0.08)]' : 'hover:bg-[color:var(--surface-strong)]/70',
           )}
         >
+          <div className="mb-2 flex items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--mauve-soft)] bg-[color:var(--surface-strong)]/80 px-2.5 py-1 text-[0.68rem] uppercase tracking-[0.18em] text-muted-foreground shadow-[0_4px_12px_rgba(28,24,18,0.04)]">
+              Fragmento guardado
+            </span>
+            <span aria-hidden="true" className="h-px flex-1 rounded-full bg-[linear-gradient(90deg,rgba(124,112,143,0.18),rgba(111,89,68,0.06),transparent)]" />
+          </div>
           <div className="flex items-center gap-1.5 text-[0.76rem] text-muted-foreground">
             <span>{formatShortDateLabel(entry.createdAtMs)}</span>
             <span aria-hidden="true">·</span>
@@ -611,9 +617,15 @@ function ReadingDocument({
 
   if (compact) {
     return (
-      <article className="mx-auto w-full max-w-3xl overflow-hidden rounded-[1.75rem] border border-border/70 bg-[color:var(--surface)]/96 shadow-[0_18px_48px_rgba(28,24,18,0.08)]">
+      <article className="reading-document--mobile mx-auto w-full max-w-3xl overflow-hidden rounded-[1.75rem] border border-border/70 bg-[color:var(--surface)]/96 shadow-[0_18px_48px_rgba(28,24,18,0.08)]">
         <div className="space-y-5 px-4 py-4 sm:px-5">
           <header className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--mauve-soft)] bg-[color:var(--surface-strong)]/78 px-2.5 py-1 text-[0.68rem] uppercase tracking-[0.18em] text-muted-foreground">
+                Fragmento aberto
+              </span>
+              <span aria-hidden="true" className="h-px flex-1 rounded-full bg-[linear-gradient(90deg,rgba(124,112,143,0.2),rgba(111,89,68,0.06),transparent)]" />
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em]">
                 {pageLabel}
@@ -922,11 +934,15 @@ function MobileReadingOverlay({
       <SheetContent
         side="bottom"
         showCloseButton={false}
-        className="reading-pane--mobile-fullscreen !left-0 !right-0 !bottom-0 !top-0 !h-[100dvh] !w-[100vw] !max-w-none !rounded-none !border-0 !p-0 flex flex-col bg-[color:var(--bg)]"
+        className="reading-pane--mobile-fullscreen reading-pane--mobile-fantasy !left-0 !right-0 !bottom-0 !top-0 !h-[100dvh] !w-[100vw] !max-w-none !rounded-none !border-0 !p-0 flex flex-col bg-[color:var(--bg)]"
       >
-        <SheetHeader className="border-b border-border/70 bg-[color:var(--surface)]/92 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-[color:var(--surface)]/82 sm:px-5">
+        <SheetHeader className="reading-pane__mobile-header border-b border-border/70 bg-[color:var(--surface)]/92 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-[color:var(--surface)]/82 sm:px-5">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-2">
+              <div className="reading-pane__mobile-ornament" aria-hidden="true">
+                <span />
+                <span />
+              </div>
               <SheetTitle className="sr-only">Leitura da memória</SheetTitle>
               <SheetDescription className="sr-only">Página aberta em modo móvel.</SheetDescription>
               <div className="flex flex-wrap items-center gap-2">
