@@ -1,4 +1,4 @@
-import type { MemoryEntry } from '../types';
+import type { DiaryEntry, MemoryEntry } from '../types';
 import { CATEGORY_LABELS, IMPORTANCE_LABELS } from './memory';
 
 const TECHNICAL_PREFIXES = [
@@ -74,7 +74,7 @@ export function presentSummary(text: string, limit = 180): string {
 
 const ENGLISH_MARKERS = [' the ', ' and ', ' with ', ' from ', ' user ', ' memory ', ' note ', ' notes ', ' daily ', ' related ', ' reading ', ' summary '];
 
-function looksEnglish(value: string): boolean {
+function looksEnglishText(value: string): boolean {
   const normalized = ` ${normalizeWhitespace(value).toLowerCase()} `;
   let hits = 0;
   for (const marker of ENGLISH_MARKERS) {
@@ -85,7 +85,7 @@ function looksEnglish(value: string): boolean {
 
 export function presentDiarySummary(record: Pick<MemoryEntry, 'title' | 'summary' | 'content' | 'category' | 'importance' | 'tags'>, limit = 120): string {
   const sourceText = [record.summary, record.content, record.title].join(' ');
-  if (!looksEnglish(sourceText)) {
+  if (!looksEnglishText(sourceText)) {
     const direct = presentText(record.summary || record.content || record.title);
     if (direct) return presentExcerpt(direct, limit);
   }
@@ -103,10 +103,33 @@ export function presentDiarySummary(record: Pick<MemoryEntry, 'title' | 'summary
 
 export function presentDiaryTitle(record: Pick<MemoryEntry, 'title' | 'summary' | 'content' | 'category'>): string {
   const sourceText = [record.summary, record.content, record.title].join(' ');
-  if (!looksEnglish(sourceText)) return presentShortTitle(record.title);
+  if (!looksEnglishText(sourceText)) return presentShortTitle(record.title);
 
   const category = CATEGORY_LABELS[record.category] ?? normalizeWhitespace(record.category.replace(/_/g, ' '));
   return `Fragmento de ${category}`;
+}
+
+export function presentDiaryEntryTitle(entry: DiaryEntry): string {
+  const sourceText = [entry.title, entry.excerpt, entry.tags.join(' '), entry.entities.join(' ')].join(' ');
+  if (!looksEnglishText(sourceText)) return presentShortTitle(entry.title);
+
+  const category = CATEGORY_LABELS[entry.category] ?? normalizeWhitespace(entry.category.replace(/_/g, ' '));
+  return `Fragmento de ${category}`;
+}
+
+export function presentDiaryEntryExcerpt(entry: DiaryEntry, limit = 120): string {
+  const sourceText = [entry.excerpt, entry.title, entry.tags.join(' '), entry.entities.join(' ')].join(' ');
+  if (!looksEnglishText(sourceText)) return presentExcerpt(entry.excerpt || entry.title, limit);
+
+  const category = CATEGORY_LABELS[entry.category] ?? normalizeWhitespace(entry.category.replace(/_/g, ' '));
+  const importance = IMPORTANCE_LABELS[entry.importance] ?? normalizeWhitespace(entry.importance.replace(/_/g, ' '));
+  const tags = entry.tags.slice(0, 2).join(' · ');
+  const parts = [
+    `Hoje ficou guardado um fragmento de ${category}.`,
+    `A importância é ${importance}.`,
+    tags ? `Marcas próximas: ${tags}.` : 'Marcas próximas discretas.',
+  ];
+  return presentExcerpt(parts.join(' '), limit);
 }
 
 export function presentLabel(value: string): string {

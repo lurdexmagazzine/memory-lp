@@ -11,7 +11,7 @@ import {
   formatTimeLabel,
   paragraphs,
 } from '../lib/memory';
-import { presentDiarySummary, presentDiaryTitle, presentExcerpt, presentLabel, presentShortTitle, presentSummary, presentTitle } from '../lib/presentation';
+import { presentDiaryEntryExcerpt, presentDiaryEntryTitle, presentDiarySummary, presentDiaryTitle, presentExcerpt, presentLabel, presentShortTitle, presentTitle } from '../lib/presentation';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -150,16 +150,19 @@ function FragmentItem({
   onSelect,
   onPickTag,
   onBeforeSelect,
+  surface,
 }: {
   entry: DiaryEntry;
   active: boolean;
   compact: boolean;
+  surface: AppSurface;
   onSelect: () => void;
   onPickTag: (value: string) => void;
   onBeforeSelect: (node: HTMLElement) => void;
 }) {
   const tags = compactTags(entry.tags, 2);
-  const displayTitle = compact ? presentShortTitle(entry.title) : presentTitle(entry.title);
+  const displayTitle = surface === 'diary' ? presentDiaryEntryTitle(entry) : compact ? presentShortTitle(entry.title) : presentTitle(entry.title);
+  const displayExcerpt = surface === 'diary' ? presentDiaryEntryExcerpt(entry, 110) : presentExcerpt(entry.excerpt, 110);
 
   if (compact) {
     return (
@@ -204,7 +207,7 @@ function FragmentItem({
           <h3 className="mt-2 font-serif text-[1rem] leading-[1.12] text-foreground [overflow-wrap:anywhere]" title={entry.title}>
             {displayTitle}
           </h3>
-          <p className="mt-2 line-clamp-2 text-[0.92rem] leading-6 text-foreground/82">{presentExcerpt(entry.excerpt, 110)}</p>
+          <p className="mt-2 line-clamp-2 text-[0.92rem] leading-6 text-foreground/82">{displayExcerpt}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="rounded-full px-2.5 py-0.5 text-[10px] tracking-[0.04em]">
               {CATEGORY_LABELS[entry.category]}
@@ -321,6 +324,7 @@ function ChapterGroup(
   onPickTag,
   onBeforeSelectRecord,
   compact,
+  surface,
 }: {
   group: DiaryGroup;
   selectedId: string | null;
@@ -328,6 +332,7 @@ function ChapterGroup(
   onPickTag: (value: string) => void;
   onBeforeSelectRecord: (node: HTMLElement) => void;
   compact: boolean;
+  surface: AppSurface;
 }) {
   const totalEntries = group.entries.length;
 
@@ -349,6 +354,7 @@ function ChapterGroup(
             key={entry.id}
             entry={entry}
             compact={compact}
+            surface={surface}
             active={entry.memoryId === selectedId}
             onSelect={() => onSelectRecord(entry.memoryId)}
             onPickTag={onPickTag}
@@ -545,6 +551,7 @@ function DiaryIndex({
                     onPickTag={onPickTag}
                     onBeforeSelectRecord={captureAnchorFromNode}
                     compact={compact}
+                    surface={surface}
                   />
                   {index < timelineGroups.length - 1 ? <Separator className="bg-border/70" /> : null}
                 </div>
@@ -585,12 +592,12 @@ function RelatedEchoItem({
       onClick={() => onSelect(record.id)}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <strong className="font-serif text-base text-foreground">{record.title}</strong>
+        <strong className="font-serif text-base text-foreground">{presentDiaryTitle(record)}</strong>
         <Badge variant="outline" className="rounded-full px-2.5 py-0.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
           {relationLabel(relation.kind)}
         </Badge>
       </div>
-      <p className="text-sm leading-6 text-foreground/82">{record.summary}</p>
+      <p className="text-sm leading-6 text-foreground/82">{presentDiarySummary(record, 90)}</p>
       <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
         peso {relation.weight.toFixed(1)} · {relation.evidence.join(' · ')}
       </p>
@@ -613,34 +620,47 @@ function ReadingDocument({
 }) {
   const displayTitle = compact ? presentShortTitle(record.title) : presentTitle(record.title);
   const showSummary = shouldShowReadingSummary(record);
-  const visibleRelated = compact ? [] : related;
+  const visibleRelated = compact ? related.slice(0, 2) : related;
 
   if (compact) {
     return (
       <article className="reading-document--mobile mx-auto w-full max-w-3xl overflow-hidden rounded-[1.75rem] border border-border/70 bg-[color:var(--surface)]/96 shadow-[0_18px_48px_rgba(28,24,18,0.08)]">
         <div className="space-y-5 px-4 py-4 sm:px-5">
-          <header className="space-y-3">
+          <header className="space-y-4">
+            <div className="reading-pane__mobile-ornament" aria-hidden="true">
+              <span />
+              <span />
+            </div>
+
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--mauve-soft)] bg-[color:var(--surface-strong)]/78 px-2.5 py-1 text-[0.68rem] uppercase tracking-[0.18em] text-muted-foreground">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--mauve-soft)] bg-[color:var(--surface-strong)]/78 px-2.5 py-1 text-[0.68rem] uppercase tracking-[0.18em] text-muted-foreground shadow-[0_4px_12px_rgba(28,24,18,0.04)]">
                 Diário do dia
               </span>
               <span aria-hidden="true" className="h-px flex-1 rounded-full bg-[linear-gradient(90deg,rgba(124,112,143,0.2),rgba(111,89,68,0.06),transparent)]" />
             </div>
+
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em]">
-                {pageLabel}
+                Data · {formatDateLabel(record.createdAtMs)}
               </Badge>
               <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
-                {CATEGORY_LABELS[record.category]}
+                Origem · {sourceLabel(record.source)}
               </Badge>
               <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
-                {sourceLabel(record.source)}
+                Importância · {IMPORTANCE_LABELS[record.importance]}
               </Badge>
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="font-serif text-[clamp(1.38rem,6vw,1.95rem)] leading-[1.08] text-foreground [overflow-wrap:anywhere]">
+                Diário do dia
+              </h2>
+              <p className="max-w-prose text-sm leading-6 text-muted-foreground">Tema · {presentDiaryTitle(record)}</p>
             </div>
           </header>
 
           <section className="reading-section space-y-3">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Hoje</p>
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Resumo</p>
             <div className="space-y-4 text-[0.96rem] leading-7 text-foreground/88">
               <p>{presentDiarySummary(record, 260)}</p>
             </div>
@@ -649,39 +669,86 @@ function ReadingDocument({
           <Separator className="bg-border/70" />
 
           <section className="reading-section space-y-3">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Marcas</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em]">
-                Data · {formatDateLabel(record.createdAtMs)}
-              </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
-                {formatTimeLabel(record.createdAtMs)}
-              </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
-                Origem · {sourceLabel(record.source)}
-              </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
-                Categoria · {CATEGORY_LABELS[record.category]}
-              </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
-                Importância · {IMPORTANCE_LABELS[record.importance]}
-              </Badge>
-              {record.tags.slice(0, 2).map((tag) => (
-                <Badge key={`${record.id}-tag-${tag}`} variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em]">
-                  {tag}
-                </Badge>
-              ))}
-              {record.tags.length > 2 ? (
-                <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
-                  +{record.tags.length - 2}
-                </Badge>
-              ) : null}
-            </div>
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Contexto</p>
+            <p className="text-[0.96rem] leading-7 text-foreground/88">
+              Hoje ficou guardado um fragmento de {CATEGORY_LABELS[record.category]} vindo de {sourceLabel(record.source)}. A entrada foi tratada como página de diário, não como nota solta.
+            </p>
+          </section>
+
+          <section className="reading-section space-y-3">
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">O que foi bom</p>
+            <p className="text-[0.96rem] leading-7 text-foreground/88">
+              {record.tags.length ? `As marcas próximas ficaram discretas e úteis: ${record.tags.slice(0, 2).join(' · ')}.` : 'O registro ficou limpo, fácil de voltar e sem excesso de ruído.'}
+            </p>
+          </section>
+
+          <section className="reading-section space-y-3">
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">O que foi ruim</p>
+            <p className="text-[0.96rem] leading-7 text-foreground/88">
+              Ainda sobra ruído quando o conteúdo chega cru demais, muito técnico ou em inglês.
+            </p>
+          </section>
+
+          <section className="reading-section space-y-3">
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">O que aprendi</p>
+            <p className="text-[0.96rem] leading-7 text-foreground/88">
+              Memória útil é memória viva: curta, clara e fácil de recuperar depois.
+            </p>
+          </section>
+
+          <section className="reading-section space-y-3">
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">O que posso melhorar amanhã</p>
+            <p className="text-[0.96rem] leading-7 text-foreground/88">
+              Condensar por dia, escrever em português BR e deixar a leitura mais parecida com um diário de verdade.
+            </p>
+          </section>
+
+          <section className="reading-section space-y-3">
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Decisões</p>
+            <p className="text-[0.96rem] leading-7 text-foreground/88">
+              Vou tratar a consolidação diária como uma página em si e manter a escrita das 22h no horário do Brasil como referência.
+            </p>
+          </section>
+
+          <section className="reading-section space-y-3">
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Próximos passos</p>
+            <p className="text-[0.96rem] leading-7 text-foreground/88">
+              Continuar ajustando o leitor para ficar mais editorial, mais calmo e com as cores da Lurdex.
+            </p>
           </section>
 
           <Separator className="bg-border/70" />
 
+          <section className="reading-section space-y-3">
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Links relacionados</p>
+            {visibleRelated.length ? (
+              <div className="grid gap-3">
+                {visibleRelated.map(({ record: relatedRecord, relation }) => (
+                  <button
+                    key={relatedRecord.id}
+                    type="button"
+                    className="rounded-[1.25rem] border border-border/70 bg-[color:var(--surface)]/94 p-3 text-left shadow-sm transition hover:bg-[color:var(--surface-strong)]/80 hover:shadow-md"
+                    onClick={() => onSelectRecord(relatedRecord.id)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <strong className="min-w-0 font-serif text-[0.98rem] leading-[1.12] text-foreground [overflow-wrap:anywhere]">{presentDiaryTitle(relatedRecord)}</strong>
+                      <Badge variant="outline" className="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                        {relationLabel(relation.kind)}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-foreground/82">{presentDiarySummary(relatedRecord, 110)}</p>
+                    <p className="mt-2 text-[0.7rem] uppercase tracking-[0.14em] text-muted-foreground">
+                      {formatShortDateLabel(relatedRecord.createdAtMs)} · {CATEGORY_LABELS[relatedRecord.category]} · {sourceLabel(relatedRecord.source)}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[0.96rem] leading-7 text-muted-foreground">Quando surgirem relações confiáveis, elas aparecem aqui como apoio à leitura.</p>
+            )}
+          </section>
         </div>
+
       </article>
     );
   }
@@ -701,7 +768,7 @@ function ReadingDocument({
           </Badge>
         </div>
         <p className="text-sm leading-6 text-muted-foreground">Leitura íntima, sem ruído de dashboard ou lista corporativa.</p>
-        {showSummary ? <p className="text-sm leading-6 text-foreground/80">{presentSummary(record.summary, 140)}</p> : null}
+        {showSummary ? <p className="text-sm leading-6 text-foreground/80">{presentDiarySummary(record, 140)}</p> : null}
       </CardHeader>
 
       <CardContent className="space-y-6 px-5 py-5 md:px-6">
@@ -919,27 +986,34 @@ function MobileReadingOverlay({
         className="reading-pane--mobile-fullscreen reading-pane--mobile-fantasy !left-0 !right-0 !bottom-0 !top-0 !h-[100dvh] !w-[100vw] !max-w-none !rounded-none !border-0 !p-0 flex flex-col bg-[color:var(--bg)]"
       >
         <SheetHeader className="reading-pane__mobile-header border-b border-border/70 bg-[color:var(--surface)]/92 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-[color:var(--surface)]/82 sm:px-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-2">
-              <SheetTitle className="sr-only">Diário aberto</SheetTitle>
-              <SheetDescription className="sr-only">Diário aberto em modo móvel.</SheetDescription>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em]">
-                  Diário
-                </Badge>
-                <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  {pageLabel}
-                </Badge>
-              </div>
-              <h2 className="font-serif text-[clamp(1.38rem,6vw,1.95rem)] leading-[1.08] text-foreground [overflow-wrap:anywhere]" title={record?.title ?? undefined}>
-                {record ? presentDiaryTitle(record) : 'Selecione uma memória'}
-              </h2>
+          <SheetTitle className="sr-only">Diário aberto</SheetTitle>
+          <SheetDescription className="sr-only">Diário aberto em modo móvel.</SheetDescription>
+          <div className="flex items-center justify-between gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              className="rounded-full border-border/70 bg-[color:var(--surface)]/92 shadow-sm"
+              onClick={onBack}
+              aria-label="Voltar para o índice"
+            >
+              <ArrowLeftIcon />
+            </Button>
+
+            <div className="flex min-w-0 flex-col items-center text-center">
+              <span className="text-[0.7rem] uppercase tracking-[0.24em] text-muted-foreground">Diário</span>
+              <span className="truncate text-[0.75rem] text-muted-foreground">{pageLabel}</span>
             </div>
 
             <SheetClose asChild>
-              <Button type="button" variant="outline" size="sm" className="rounded-full px-3 text-[0.8rem] text-muted-foreground shadow-sm">
-                Fechar
-                <XIcon data-icon="inline-end" />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="rounded-full border-border/70 bg-[color:var(--surface)]/92 shadow-sm"
+                aria-label="Fechar leitura"
+              >
+                <XIcon />
               </Button>
             </SheetClose>
           </div>
@@ -961,21 +1035,18 @@ function MobileReadingOverlay({
 
         <SheetFooter className="reading-pane__mobile-nav border-t border-border/70 bg-[color:var(--surface)]/96 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:px-5">
           <div className="reading-pane__mobile-nav-row">
-            <Button type="button" variant="outline" size="sm" className="reading-pane__mobile-nav-back rounded-full" onClick={onBack}>
+            <Button type="button" variant="ghost" size="sm" className="reading-pane__mobile-nav-action reading-pane__mobile-nav-back" onClick={onBack}>
               <ArrowLeftIcon data-icon="inline-start" />
               Voltar
             </Button>
-            <div className="reading-pane__mobile-nav-stepper">
-              <Button type="button" variant="ghost" size="sm" className="reading-pane__mobile-nav-step" onClick={onPrevious} disabled={!hasPrevious}>
-                <ChevronLeftIcon data-icon="inline-start" />
-                Anterior
-              </Button>
-              <span aria-hidden="true" className="reading-pane__mobile-nav-divider" />
-              <Button type="button" variant="ghost" size="sm" className="reading-pane__mobile-nav-step" onClick={onNext} disabled={!hasNext}>
-                Próxima
-                <ChevronRightIcon data-icon="inline-end" />
-              </Button>
-            </div>
+            <Button type="button" variant="ghost" size="sm" className="reading-pane__mobile-nav-action" onClick={onPrevious} disabled={!hasPrevious}>
+              <ChevronLeftIcon data-icon="inline-start" />
+              Anterior
+            </Button>
+            <Button type="button" variant="ghost" size="sm" className="reading-pane__mobile-nav-action" onClick={onNext} disabled={!hasNext}>
+              Próxima
+              <ChevronRightIcon data-icon="inline-end" />
+            </Button>
           </div>
         </SheetFooter>
       </SheetContent>
