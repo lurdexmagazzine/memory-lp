@@ -16,7 +16,7 @@ const CATEGORY_LABELS = {
   all: 'Todas',
   brand: 'Marca',
   voice: 'Voz',
-  workflow: 'Fluxo',
+  workflow: 'Rotina',
   product: 'Produto',
   project: 'Projeto',
   platform: 'Plataforma',
@@ -54,48 +54,67 @@ const timeFmt = new Intl.DateTimeFormat('pt-BR', {
   minute: '2-digit',
 });
 
-const escapeHTML = (value) =>
-  String(value)
+function escapeHTML(value) {
+  return String(value)
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
 
-const parseTags = (tags) => {
+function parseTags(tags) {
   if (Array.isArray(tags)) return tags;
   if (!tags) return [];
+
   return String(tags)
     .split(',')
     .map((tag) => tag.trim())
     .filter(Boolean);
-};
+}
 
-const memoryTitle = (memory) => memory.title || memory.content.split(' :: ')[0].slice(0, 42);
+function memoryTitle(memory) {
+  return memory.title || memory.content.split(' :: ')[0].slice(0, 42);
+}
 
-const getCategoryLabel = (category) => CATEGORY_LABELS[category] || category || 'Memória';
+function getCategoryLabel(category) {
+  return CATEGORY_LABELS[category] || category || 'Memória';
+}
 
 function formatDate(value) {
   if (!value) return 'sem data';
+
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : dateFmt.format(parsed);
 }
 
 function formatTime(value) {
   if (!value) return 'agora';
+
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? 'agora' : timeFmt.format(parsed);
 }
 
 function formatSyncStatus(value) {
-  return value ? `sincronizado às ${formatTime(value)}` : 'sincronizando…';
+  return value ? `atualizado às ${formatTime(value)}` : 'atualizando…';
 }
 
-function excerpt(text, limit = 145) {
+function excerpt(text, limit = 140) {
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
   if (!clean) return '';
   if (clean.length <= limit) return clean;
   return `${clean.slice(0, limit - 1).trimEnd()}…`;
+}
+
+function renderParagraphs(text) {
+  const blocks = String(text || '')
+    .split(/\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (!blocks.length) return '<p></p>';
+
+  return blocks.map((block) => `<p>${escapeHTML(block)}</p>`).join('');
 }
 
 function memorySignature(list) {
@@ -148,9 +167,9 @@ function renderList(list) {
   if (!list.length) {
     els.list.innerHTML = `
       <div class="detail-placeholder">
-        <p class="detail-placeholder__eyebrow">Nada encontrado</p>
-        <h2>Sem memória com esse filtro</h2>
-        <p>Troque a busca ou o filtro. O diário continua aí, só ficou mais exigente.</p>
+        <p class="detail-placeholder__eyebrow">Nada por aqui</p>
+        <h2>Nenhuma memória neste recorte</h2>
+        <p>Ajuste a busca ou os filtros. O acervo continua inteiro, só saiu de cena por enquanto.</p>
       </div>
     `;
     return;
@@ -160,7 +179,7 @@ function renderList(list) {
     .map((memory) => {
       const tags = parseTags(memory.tags);
       const active = memory.id === state.activeId ? 'is-active' : '';
-      const handle = MOBILE_QUERY.matches ? 'Toque para abrir' : 'Abrir leitura';
+      const handle = MOBILE_QUERY.matches ? 'Abrir' : 'Abrir leitura';
 
       return `
         <button class="memory-card ${active}" type="button" data-id="${escapeHTML(memory.id)}" aria-pressed="${memory.id === state.activeId ? 'true' : 'false'}">
@@ -178,7 +197,6 @@ function renderList(list) {
             <div class="tag-row">
               ${tags.slice(0, 3).map((tag) => `<span class="tag-pill">${escapeHTML(tag)}</span>`).join('')}
             </div>
-            <span class="memory-card__hint">${escapeHTML(handle)}</span>
           </div>
         </button>
       `;
@@ -193,8 +211,12 @@ function closeDetailSheet() {
 
 function openDetailSheet() {
   if (!MOBILE_QUERY.matches) return;
+
   document.body.classList.add('is-detail-open');
   els.backdrop.hidden = false;
+  requestAnimationFrame(() => {
+    els.detail.scrollTop = 0;
+  });
 }
 
 function renderDetail(memory) {
@@ -203,7 +225,7 @@ function renderDetail(memory) {
       <div class="detail-placeholder">
         <p class="detail-placeholder__eyebrow">Leitura</p>
         <h2>Escolha uma memória</h2>
-        <p>Toque em um cartão para abrir o texto completo aqui.</p>
+        <p>Selecione um cartão para ver o texto completo aqui.</p>
       </div>
     `;
     return;
@@ -221,21 +243,23 @@ function renderDetail(memory) {
           </div>
           <p class="detail__eyebrow">${escapeHTML(getCategoryLabel(memory.category))} · ${escapeHTML(formatDate(memory.created_at))}</p>
           <h2>${escapeHTML(memoryTitle(memory))}</h2>
-          <p class="detail__lede">Leitura sem edição, direto do Holographic.</p>
+          <p class="detail__lede">Texto original, sem edição.</p>
         </div>
 
-        <div class="detail__panel">
-          <p class="detail__body">${escapeHTML(memory.content)}</p>
+        <div class="detail__panel detail__panel--body">
+          <div class="detail__body">
+            ${renderParagraphs(memory.content)}
+          </div>
         </div>
 
         <div class="detail__panel detail__panel--tags">
-          <div class="detail__label">Palavras-chave</div>
+          <div class="detail__label">Assuntos</div>
           <div class="tag-row">
             ${tags.map((tag) => `<span class="tag-pill">${escapeHTML(tag)}</span>`).join('')}
           </div>
         </div>
 
-        <p class="detail__note">Atualizado automaticamente pelo Holographic.</p>
+        <p class="detail__note">Atualizado automaticamente.</p>
       </div>
     </article>
   `;
@@ -299,7 +323,7 @@ async function refreshMemories({ silent = true } = {}) {
 
   try {
     if (!silent) {
-      setSyncStatus('sincronizando…');
+      setSyncStatus('atualizando…');
     }
 
     const next = await loadMemories();
@@ -315,21 +339,21 @@ async function refreshMemories({ silent = true } = {}) {
     setSyncStatus(formatSyncStatus(state.lastSyncedAt));
   } catch (error) {
     console.error(error);
-    setSyncStatus('falha ao atualizar');
+    setSyncStatus('não foi possível atualizar');
 
     if (!state.memories.length) {
       els.list.innerHTML = `
         <div class="detail-placeholder">
-          <p class="detail-placeholder__eyebrow">Erro ao carregar</p>
-          <h2>Sem snapshot</h2>
-          <p>Não consegui ler <code>data/memories.json</code>. Verifique o deploy e tente novamente.</p>
+          <p class="detail-placeholder__eyebrow">Falha ao carregar</p>
+          <h2>Não foi possível carregar as memórias</h2>
+          <p>Tente recarregar em alguns instantes.</p>
         </div>
       `;
       els.detail.innerHTML = `
         <div class="detail-placeholder">
           <p class="detail-placeholder__eyebrow">Erro</p>
-          <h2>Não abriu</h2>
-          <p>${escapeHTML(error.message)}</p>
+          <h2>Não foi possível abrir</h2>
+          <p>Tente recarregar a página e abrir outra memória.</p>
         </div>
       `;
     }
@@ -396,7 +420,7 @@ function bindEvents() {
 async function init() {
   try {
     bindEvents();
-    setSyncStatus('sincronizando…');
+    setSyncStatus('atualizando…');
     await refreshMemories({ silent: false });
     renderApp();
 
@@ -407,19 +431,19 @@ async function init() {
     console.error(error);
     els.list.innerHTML = `
       <div class="detail-placeholder">
-        <p class="detail-placeholder__eyebrow">Erro ao carregar</p>
-        <h2>Sem snapshot</h2>
-        <p>O app não conseguiu inicializar. Veja o console e confira o deploy.</p>
+        <p class="detail-placeholder__eyebrow">Falha ao carregar</p>
+        <h2>Não foi possível carregar as memórias</h2>
+        <p>Tente recarregar a página.</p>
       </div>
     `;
     els.detail.innerHTML = `
       <div class="detail-placeholder">
         <p class="detail-placeholder__eyebrow">Erro</p>
-        <h2>Não abriu</h2>
+        <h2>Não foi possível abrir</h2>
         <p>${escapeHTML(error.message)}</p>
       </div>
     `;
-    setSyncStatus('falha ao atualizar');
+    setSyncStatus('não foi possível atualizar');
   }
 }
 

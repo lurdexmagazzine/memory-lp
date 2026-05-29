@@ -14,38 +14,38 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="bg-orbit bg-orbit--one"></div>
-    <div class="bg-orbit bg-orbit--two"></div>
+    <div class="bg-orbit bg-orbit--one" aria-hidden="true"></div>
+    <div class="bg-orbit bg-orbit--two" aria-hidden="true"></div>
 
-    <div class="page-shell">
+    <main class="page-shell">
       <header class="hero">
-        <div class="eyebrow">Diário da Melissa · somente leitura</div>
         <div class="hero__grid">
           <div class="hero__copy">
-            <h1>Memórias para abrir com calma.</h1>
+            <p class="eyebrow">Diário da Melissa · leitura reservada</p>
+            <h1>Memórias para ler sem pressa.</h1>
             <p class="hero__lede">
-              Um caderno vivo da Melissa: notas, decisões e lembranças organizadas para leitura
+              Um caderno vivo da Melissa: notas, decisões e lembranças reunidas para leitura
               confortável no celular e no desktop.
             </p>
           </div>
 
           <aside class="hero__card" aria-label="Resumo do diário">
-            <p class="hero__label">Disponível agora</p>
+            <p class="hero__label">Coleção ativa</p>
             <p class="hero__value" id="hero-count">—</p>
-            <p class="hero__note">memórias no diário</p>
-            <p class="hero__sync" id="sync-status">sincronizando…</p>
+            <p class="hero__note">memórias reunidas</p>
+            <p class="hero__sync" id="sync-status" aria-live="polite">atualizando…</p>
           </aside>
         </div>
       </header>
 
-      <main class="layout">
+      <section class="workspace" aria-label="Leitura das memórias">
         <section class="pane pane--list" aria-label="Lista de memórias">
           <div class="toolbar">
             <label class="search-wrap" for="search">
               <span>Buscar</span>
               <input id="search" type="search" placeholder="Palavra, tema ou data" />
             </label>
-            <p class="toolbar__hint">Toque em uma memória para abrir a leitura.</p>
+            <p class="toolbar__hint">Escolha uma memória para ler com calma.</p>
             <div class="filter-row" id="filters" aria-label="Filtros de categoria"></div>
           </div>
 
@@ -56,11 +56,11 @@
           <div class="detail-placeholder">
             <p class="detail-placeholder__eyebrow">Leitura</p>
             <h2>Escolha uma memória</h2>
-            <p>Toque em um cartão para abrir o texto completo aqui.</p>
+            <p>Selecione um cartão para ver o texto completo aqui.</p>
           </div>
         </aside>
-      </main>
-    </div>
+      </section>
+    </main>
 
     <div class="detail-backdrop" id="detail-backdrop" hidden></div>
     <script src="./app.js" type="module"></script>
