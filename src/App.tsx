@@ -145,8 +145,11 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState<MobileView>('index');
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const scrollAnchorRef = useRef<number>(0);
+  const timelineScrollTopRef = useRef(0);
+  const timelineRestorePendingRef = useRef(false);
+  const indexScrollContainerRef = useRef<HTMLDivElement>(null);
   const filterTriggerRef = useRef<HTMLElement | null>(null);
+  const readingReturnFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -172,6 +175,19 @@ function App() {
       active = false;
     };
   }, [reloadTick]);
+
+  useEffect(() => {
+    const readingOpen = mobile && mobileView === 'reading';
+    document.body.classList.toggle('is-reading-open', readingOpen);
+    document.documentElement.classList.toggle('is-reading-open', readingOpen);
+    document.getElementById('root')?.classList.toggle('is-reading-open', readingOpen);
+
+    return () => {
+      document.body.classList.remove('is-reading-open');
+      document.documentElement.classList.remove('is-reading-open');
+      document.getElementById('root')?.classList.remove('is-reading-open');
+    };
+  }, [mobile, mobileView]);
 
   useEffect(() => {
     document.body.classList.toggle('is-sheet-open', filtersOpen);
@@ -226,17 +242,11 @@ function App() {
     }
   }, [visibleRecords, selectedId, mobile, mobileView]);
 
-  useEffect(() => {
-    if (!mobile && mobileView === 'index') return;
-    if (mobileView === 'reading') {
-      window.scrollTo(0, 0);
-    }
-  }, [mobile, mobileView]);
-
   const totalCount = dataset?.records.length ?? 0;
   const visibleCount = visibleRecords.length;
   const activeFilterSummary = useMemo(() => buildFilterSummary(filters), [filters]);
   const activeFilterCount = activeFilterSummary.length;
+  const mobileTimelineRestoreTop = mobile && mobileView === 'index' && timelineRestorePendingRef.current ? timelineScrollTopRef.current : null;
   const syncTone: PillTone =
     status === 'error'
       ? 'danger'
@@ -274,24 +284,31 @@ function App() {
     setFilters(DEFAULT_FILTERS);
   };
 
+  const rememberMobileTimelinePosition = () => {
+    if (!mobile || mobileView !== 'index') return;
+    timelineScrollTopRef.current = indexScrollContainerRef.current?.scrollTop ?? 0;
+    timelineRestorePendingRef.current = true;
+  };
+
+  const handleTimelineRestoreComplete = () => {
+    timelineRestorePendingRef.current = false;
+  };
+
   const openRecord = (id: string) => {
     const wasMobileReading = mobile && mobileView === 'reading';
+    readingReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setSelectedId(id);
 
     if (mobile) {
-      if (!wasMobileReading) {
-        scrollAnchorRef.current = window.scrollY;
+      if (!wasMobileReading && !timelineRestorePendingRef.current) {
+        rememberMobileTimelinePosition();
       }
       setMobileView('reading');
-      window.scrollTo(0, 0);
     }
   };
 
   const backToIndex = () => {
     setMobileView('index');
-    window.requestAnimationFrame(() => {
-      window.scrollTo(0, scrollAnchorRef.current);
-    });
   };
 
   const openFilters = () => {
@@ -344,7 +361,12 @@ function App() {
       selectedRecord={selectedRecord}
       relatedRecords={relatedRecords}
       mobileView={mobileView}
+      indexScrollRef={indexScrollContainerRef}
+      mobileTimelineRestoreTop={mobileTimelineRestoreTop}
+      restoreFocusRef={readingReturnFocusRef}
       filtersOpen={filtersOpen}
+      onRememberTimelinePosition={rememberMobileTimelinePosition}
+      onTimelineRestoreComplete={handleTimelineRestoreComplete}
       onSelectRecord={openRecord}
       onBackToIndex={backToIndex}
       onQueryChange={(value) => patchFilters({ query: value })}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import type { AppSurface, DiaryGroup, FacetOption, MemoryEntry, MemoryFilters, MemoryRelation } from '../types';
 import type { FacetGroups } from '../lib/memory';
 import {
@@ -130,7 +130,7 @@ function IndexToolbar({
 
       <div className="index-toolbar__meta">
         <p className="index-toolbar__summary">
-          {activeFilterSummary.length ? activeFilterSummary.join(' · ') : 'Timeline em ordem editorial.'}
+          {activeFilterSummary.length ? activeFilterSummary.join(' · ') : 'Fragmentos por data, com leitura em camadas.'}
         </p>
       </div>
     </header>
@@ -142,11 +142,13 @@ function MemoryListItem({
   active,
   onSelect,
   onPickTag,
+  onBeforeSelect,
 }: {
   record: MemoryEntry;
   active: boolean;
   onSelect: () => void;
   onPickTag: (value: string) => void;
+  onBeforeSelect: () => void;
 }) {
   const tags = compactTags(record.tags, 2);
 
@@ -155,6 +157,7 @@ function MemoryListItem({
       <button
         type="button"
         className="memory-list-item__body"
+        onPointerDown={onBeforeSelect}
         onClick={onSelect}
         aria-current={active ? 'true' : undefined}
       >
@@ -187,21 +190,24 @@ function DayGroup({
   selectedId,
   onSelectRecord,
   onPickTag,
+  onBeforeSelectRecord,
 }: {
   group: DiaryGroup;
   selectedId: string | null;
   onSelectRecord: (id: string) => void;
   onPickTag: (value: string) => void;
+  onBeforeSelectRecord: () => void;
 }) {
   const totalEntries = group.entries.length;
 
   return (
     <article className="day-group">
       <header className="day-group__header">
-        <div>
-          <p className="day-group__eyebrow">{group.label}</p>
-          <h3>{totalEntries} {totalEntries === 1 ? 'entrada' : 'entradas'}</h3>
+        <div className="day-group__heading">
+          <p className="day-group__eyebrow">Capítulo</p>
+          <h3>{group.label}</h3>
         </div>
+        <p className="day-group__count">{totalEntries} {totalEntries === 1 ? 'fragmento' : 'fragmentos'}</p>
       </header>
 
       <div className="day-group__list">
@@ -233,6 +239,7 @@ function DayGroup({
             active={entry.memoryId === selectedId}
             onSelect={() => onSelectRecord(entry.memoryId)}
             onPickTag={onPickTag}
+            onBeforeSelect={onBeforeSelectRecord}
           />
         ))}
       </div>
@@ -256,6 +263,11 @@ function MemoryIndex({
   selectedId,
   onSelectRecord,
   onPickTag,
+  scrollRef,
+  onBeforeSelectRecord,
+  restoreScrollTop,
+  restoreFocusRef,
+  onRestoreComplete,
 }: {
   query: string;
   onQueryChange: (value: string) => void;
@@ -272,14 +284,31 @@ function MemoryIndex({
   selectedId: string | null;
   onSelectRecord: (id: string) => void;
   onPickTag: (value: string) => void;
+  scrollRef: RefObject<HTMLDivElement>;
+  onBeforeSelectRecord: () => void;
+  restoreScrollTop: number | null;
+  restoreFocusRef: RefObject<HTMLElement | null>;
+  onRestoreComplete: () => void;
 }) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-
   useEffect(() => {
-    if (compact || !selectedId) return;
+    if (!compact || !selectedId || restoreScrollTop !== null) return;
     const activeButton = scrollRef.current?.querySelector<HTMLElement>('.memory-list-item.is-active .memory-list-item__body');
     activeButton?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [compact, selectedId, timelineGroups.length]);
+  }, [compact, restoreScrollTop, selectedId, timelineGroups.length]);
+
+  useEffect(() => {
+    if (!compact || restoreScrollTop === null || !scrollRef.current) return;
+    const restoreTop = restoreScrollTop;
+    const frame = window.requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: restoreTop, behavior: 'auto' });
+      window.requestAnimationFrame(() => {
+        restoreFocusRef.current?.focus({ preventScroll: true });
+        onRestoreComplete();
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [compact, onRestoreComplete, restoreFocusRef, restoreScrollTop, scrollRef]);
 
   return (
     <section className={cx('index-pane', compact && 'index-pane--compact')} aria-label="Índice de memórias">
@@ -307,6 +336,7 @@ function MemoryIndex({
                 selectedId={selectedId}
                 onSelectRecord={onSelectRecord}
                 onPickTag={onPickTag}
+                onBeforeSelectRecord={onBeforeSelectRecord}
               />
             ))}
           </section>
@@ -325,24 +355,13 @@ function MemoryIndex({
 function ReadingMetadata({ record }: { record: MemoryEntry }) {
   return (
     <section className="reading-metadata" aria-label="Metadados da memória">
-      <div>
-        <span>Data</span>
-        <strong>
-          {formatDateLabel(record.createdAtMs)} · {formatTimeLabel(record.createdAtMs)}
-        </strong>
-      </div>
-      <div>
-        <span>Categoria</span>
-        <strong>{CATEGORY_LABELS[record.category]}</strong>
-      </div>
-      <div>
-        <span>Origem</span>
-        <strong>{sourceLabel(record.source)}</strong>
-      </div>
-      <div>
-        <span>Importância</span>
-        <strong>{IMPORTANCE_LABELS[record.importance]}</strong>
-      </div>
+      <StatusPill label={`Data · ${formatDateLabel(record.createdAtMs)} · ${formatTimeLabel(record.createdAtMs)}`} tone="neutral" />
+      <StatusPill label={`Categoria · ${CATEGORY_LABELS[record.category]}`} tone="accent" />
+      <StatusPill label={`Origem · ${sourceLabel(record.source)}`} tone="neutral" />
+      <StatusPill
+        label={`Importância · ${IMPORTANCE_LABELS[record.importance]}`}
+        tone={record.importance === 'anchor' || record.importance === 'high' ? 'warning' : 'good'}
+      />
     </section>
   );
 }
@@ -357,7 +376,7 @@ function RelatedMemories({
   if (!items.length) {
     return (
       <EmptyState
-        eyebrow="Relacionadas"
+        eyebrow="Ecos relacionados"
         title="Sem relações fortes"
         description="Quando houver relações confiáveis, elas aparecem aqui como apoio à leitura."
       />
@@ -366,7 +385,7 @@ function RelatedMemories({
 
   return (
     <section className="reading-section">
-      <p className="reading-section__eyebrow">Relacionadas</p>
+      <p className="reading-section__eyebrow">Ecos relacionados</p>
       <div className="related-list">
         {items.map(({ record, relation }) => (
           <button type="button" className="related-entry" key={record.id} onClick={() => onSelect(record.id)}>
@@ -398,12 +417,12 @@ function ReadingPane({
 }) {
   if (!record) {
     return (
-      <section className="reading-pane" aria-label="Leitura da memória">
+      <section className={cx('reading-pane', mobile && 'reading-pane--mobile-fullscreen')} aria-label="Leitura da memória">
         <div className="reading-pane__scroll">
           <EmptyState
             eyebrow="Leitura"
             title="Selecione uma memória"
-            description="A entrada abre aqui como uma página de diário com data, conteúdo e relações ao fim."
+            description="A entrada abre aqui como uma página de diário com data, conteúdo e ecos ao fim."
             action={mobile ? <button type="button" className="ui-button" onClick={onBack}>Voltar</button> : undefined}
           />
         </div>
@@ -412,7 +431,7 @@ function ReadingPane({
   }
 
   return (
-    <section className="reading-pane" aria-label={`Leitura de ${record.title}`}>
+    <section className={cx('reading-pane', mobile && 'reading-pane--mobile-fullscreen')} aria-label={`Leitura de ${record.title}`}>
       <div className="reading-pane__scroll">
         {mobile ? (
           <div className="reading-pane__mobile-bar">
@@ -432,7 +451,7 @@ function ReadingPane({
         <ReadingMetadata record={record} />
 
         <section className="reading-section">
-          <p className="reading-section__eyebrow">Conteúdo</p>
+          <p className="reading-section__eyebrow">Anotação</p>
           <div className="reading-content">
             {paragraphs(record.content).map((paragraph, index) => (
               <p key={`${record.id}-${index}`}>{paragraph}</p>
@@ -441,7 +460,7 @@ function ReadingPane({
         </section>
 
         <section className="reading-section">
-          <p className="reading-section__eyebrow">Tags e entidades</p>
+          <p className="reading-section__eyebrow">Marcas</p>
           <div className="reading-chip-row">
             {record.tags.length ? record.tags.map((tag) => <StatusPill key={`${record.id}-tag-${tag}`} label={tag} tone="accent" />) : <StatusPill label="Sem tags" tone="neutral" />}
             {record.entities.length ? record.entities.map((entity) => <StatusPill key={`${record.id}-entity-${entity}`} label={entity} tone="neutral" />) : <StatusPill label="Sem entidades" tone="neutral" />}
@@ -611,7 +630,12 @@ export interface AppShellProps {
   selectedRecord: MemoryEntry | null;
   relatedRecords: Array<{ record: MemoryEntry; relation: MemoryRelation }>;
   mobileView: 'index' | 'reading';
+  indexScrollRef: RefObject<HTMLDivElement>;
+  mobileTimelineRestoreTop: number | null;
+  restoreFocusRef: RefObject<HTMLElement | null>;
   filtersOpen: boolean;
+  onRememberTimelinePosition: () => void;
+  onTimelineRestoreComplete: () => void;
   onSelectRecord: (id: string) => void;
   onBackToIndex: () => void;
   onQueryChange: (value: string) => void;
@@ -638,6 +662,11 @@ function NotebookLayout({
   selectedRecord,
   relatedRecords,
   mobileView,
+  indexScrollRef,
+  mobileTimelineRestoreTop,
+  restoreFocusRef,
+  onRememberTimelinePosition,
+  onTimelineRestoreComplete,
   onSelectRecord,
   onBackToIndex,
   onQueryChange,
@@ -671,6 +700,11 @@ function NotebookLayout({
           selectedId={selectedRecord?.id ?? null}
           onSelectRecord={onSelectRecord}
           onPickTag={(value) => onToggleFilter('tag', value)}
+          scrollRef={indexScrollRef}
+          onBeforeSelectRecord={onRememberTimelinePosition}
+          restoreScrollTop={mobileTimelineRestoreTop}
+          restoreFocusRef={restoreFocusRef}
+          onRestoreComplete={onTimelineRestoreComplete}
         />
       ) : null}
 
