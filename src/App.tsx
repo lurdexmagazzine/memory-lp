@@ -279,14 +279,6 @@ function App() {
     }
   }
 
-  function openInspectorForCurrent() {
-    if (!focusRecord) return;
-    setInspectedId(focusRecord.id);
-    if (isMobile) {
-      setMobileInspectorOpen(true);
-    }
-  }
-
   function closeInspector() {
     if (isMobile) {
       setMobileInspectorOpen(false);
@@ -403,8 +395,8 @@ function App() {
   })();
 
   const desktopInspectorRecord = !isMobile ? inspectedRecord : null;
-  const mobileInspectorVisible = isMobile && mobileInspectorOpen;
-  const mobileInspectorRecord = mobileInspectorVisible ? inspectedRecord ?? focusRecord : null;
+  const mobileInspectorVisible = isMobile && mobileInspectorOpen && Boolean(inspectedRecord);
+  const mobileInspectorRecord = mobileInspectorVisible ? inspectedRecord : null;
 
   return isMobile ? (
     <div className="app-shell app-shell--mobile">
@@ -421,24 +413,14 @@ function App() {
         selectedTitle={selectedTitle}
         activeFilterCount={activeFilterCount}
         onOpenFilters={() => setFiltersOpen(true)}
-        onOpenInspector={openInspectorForCurrent}
-        inspectorAvailable={Boolean(focusRecord)}
         showSwitcher
       />
-
-      <FilterToolbar activeLabels={activeFilterLabelsList} onOpenFilters={() => setFiltersOpen(true)} onClear={clearFilters} />
 
       <main className="app-shell__main app-shell__main--mobile" aria-label="Área principal">
         {mainContent}
       </main>
 
-      <MobileBottomNav
-        surface={surface}
-        onSurfaceChange={handleSurfaceChange}
-        onOpenInspector={openInspectorForCurrent}
-        inspectorAvailable={Boolean(focusRecord)}
-        inspectorOpen={mobileInspectorVisible}
-      />
+      <MobileBottomNav surface={surface} onSurfaceChange={handleSurfaceChange} />
 
       <FilterDrawer
         open={filtersOpen}
@@ -493,8 +475,6 @@ function App() {
           selectedTitle={selectedTitle}
           activeFilterCount={activeFilterCount}
           onOpenFilters={() => setFiltersOpen(true)}
-          onOpenInspector={openInspectorForCurrent}
-          inspectorAvailable={Boolean(desktopInspectorRecord)}
           showSwitcher={false}
         />
 

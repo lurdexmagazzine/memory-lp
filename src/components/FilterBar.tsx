@@ -117,7 +117,7 @@ export function FilterDrawer({
             <button type="button" className="toolbar-button" onClick={onClear}>
               Limpar
             </button>
-            <button type="button" className="toolbar-button toolbar-button--ghost" onClick={onClose}>
+            <button type="button" className="toolbar-button toolbar-button--ghost" onClick={onClose} autoFocus={mobile}>
               Fechar
             </button>
           </div>

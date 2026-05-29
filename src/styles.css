@@ -130,7 +130,7 @@ svg {
 
 .app-shell--mobile {
   width: min(100%, calc(100% - 0.5rem));
-  padding: 0.5rem 0 calc(6.9rem + env(safe-area-inset-bottom));
+  padding: 0.5rem 0 calc(5.6rem + env(safe-area-inset-bottom));
   grid-template-columns: 1fr;
 }
 
@@ -206,10 +206,11 @@ svg {
 
 .shell-sidebar__brand h2 {
   margin: 0;
-  font-family: var(--serif);
-  font-size: 2.2rem;
-  line-height: 0.9;
-  letter-spacing: -0.03em;
+  font-family: var(--sans);
+  font-size: 1.05rem;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .shell-sidebar__subtitle {
@@ -272,7 +273,88 @@ svg {
 
 .topbar--mobile {
   top: 0.45rem;
-  padding: 0.8rem 0.85rem;
+  padding: 0.28rem 0.35rem;
+  gap: 0.35rem;
+}
+
+.topbar__brand--mobile {
+  gap: 0.1rem;
+}
+
+.topbar__brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.topbar__brand-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.topbar__brand-row h1 {
+  font-size: 0.98rem;
+  line-height: 1.05;
+  min-width: 0;
+}
+
+.topbar__counts--mobile {
+  margin: 0;
+  color: rgba(244, 238, 230, 0.68);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.topbar__mobile-actions {
+  display: flex;
+  gap: 0.35rem;
+  align-items: end;
+  min-width: 0;
+}
+
+.topbar__search--mobile {
+  flex: 1 1 auto;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.topbar__search--mobile input {
+  padding: 0.6rem 0.72rem;
+  border-radius: 14px;
+  font-size: 0.88rem;
+}
+
+.topbar__filters-button {
+  flex: 0 0 auto;
+  width: auto;
+  white-space: nowrap;
+  padding: 0.58rem 0.68rem;
+  font-size: 0.84rem;
+  line-height: 1;
+}
+
+.topbar--mobile .status-pill {
+  padding: 0.38rem 0.54rem;
+  font-size: 0.72rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .topbar__brand {
@@ -307,6 +389,7 @@ svg {
 .search-field {
   display: grid;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .search-field span {
@@ -843,6 +926,17 @@ svg {
   border-radius: 24px;
   border: 1px solid rgba(20, 25, 35, 0.08);
   background: rgba(255, 255, 255, 0.82);
+  position: relative;
+}
+
+.brain-focus__relations::before {
+  content: '';
+  position: absolute;
+  left: 1.15rem;
+  top: 4.1rem;
+  bottom: 1.1rem;
+  width: 1px;
+  background: linear-gradient(180deg, rgba(141, 109, 179, 0.4), rgba(141, 109, 179, 0.06));
 }
 
 .brain-focus__relations-head {
@@ -851,6 +945,8 @@ svg {
   gap: 1rem;
   align-items: flex-start;
   flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
 }
 
 .brain-focus__relations-head h4 {
@@ -862,6 +958,8 @@ svg {
 .brain-relation-stack {
   display: grid;
   gap: 0.7rem;
+  position: relative;
+  padding-left: 1rem;
 }
 
 .brain-relation-card {
@@ -876,6 +974,27 @@ svg {
   text-align: left;
   cursor: pointer;
   min-width: 0;
+  position: relative;
+}
+
+.brain-relation-card::before {
+  content: '';
+  position: absolute;
+  left: -1rem;
+  top: 1.2rem;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  border: 2px solid rgba(141, 109, 179, 0.55);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(185, 150, 210, 0.14);
+}
+
+.brain-relation-card:hover,
+.brain-relation-card:focus-visible {
+  border-color: rgba(141, 109, 179, 0.36);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(20, 25, 35, 0.08);
 }
 
 .brain-relation-card__head {
@@ -1230,6 +1349,7 @@ svg {
   width: 100%;
   max-height: 86dvh;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 0.5rem;
 }
 
@@ -1247,20 +1367,22 @@ svg {
   bottom: 0;
   z-index: var(--z-overlay);
   display: none;
-  gap: 0.5rem;
-  padding: 0.75rem 0.8rem calc(0.75rem + env(safe-area-inset-bottom));
+  gap: 0.4rem;
+  padding: 0.35rem 0.45rem calc(0.35rem + env(safe-area-inset-bottom));
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(9, 12, 18, 0.92);
   backdrop-filter: blur(18px);
 }
 
 .bottom-nav__button {
-  padding: 0.88rem 0.8rem;
-  border-radius: 18px;
+  padding: 0.58rem 0.55rem;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(244, 238, 230, 0.74);
   font-weight: 700;
+  font-size: 0.93rem;
+  line-height: 1;
   cursor: pointer;
   min-width: 0;
   overflow-wrap: anywhere;
@@ -1312,7 +1434,7 @@ svg {
 
   .topbar {
     top: 0.45rem;
-    padding: 0.88rem 0.85rem;
+    padding: 0.28rem 0.35rem;
   }
 
   .topbar__actions {
@@ -1360,6 +1482,7 @@ svg {
   .inspector-sheet,
   .bottom-nav {
     display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .app-shell__main--mobile {
@@ -1416,7 +1539,8 @@ svg {
   }
 
   .bottom-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

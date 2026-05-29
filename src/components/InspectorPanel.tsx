@@ -60,7 +60,7 @@ export function InspectorPanel({
           <h2>{record ? record.title : 'Nenhuma memória selecionada'}</h2>
           <p className="inspector__subtitle">{record ? recordToInspectorSummary(record) : 'Escolha um nó no Brain ou um card do Diary para abrir o detalhe.'}</p>
         </div>
-        <button type="button" className="toolbar-button toolbar-button--ghost" onClick={onClose}>
+        <button type="button" className="toolbar-button toolbar-button--ghost" onClick={onClose} autoFocus={mobile}>
           Fechar
         </button>
       </div>

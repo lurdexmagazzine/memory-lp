@@ -16,8 +16,6 @@ export function TopBar({
   selectedTitle,
   activeFilterCount,
   onOpenFilters,
-  onOpenInspector,
-  inspectorAvailable,
   showSwitcher = true,
 }: {
   mobile: boolean;
@@ -32,29 +30,38 @@ export function TopBar({
   selectedTitle: string;
   activeFilterCount: number;
   onOpenFilters: () => void;
-  onOpenInspector: () => void;
-  inspectorAvailable: boolean;
   showSwitcher?: boolean;
 }) {
   if (mobile) {
+    const mobileSyncLabel = `${syncLabel} · ${visibleCount}/${totalCount}`;
+
     return (
       <header className="topbar topbar--mobile" aria-label="Cabeçalho do visor">
-        <div className="topbar__brand">
-          <p className="topbar__eyebrow">Memory Brain & Diary Viewer</p>
-          <h1>Memory</h1>
-          <StatusPill label={syncLabel} tone={syncTone} />
+        <div className="topbar__brand topbar__brand--mobile">
+          <div className="topbar__brand-row">
+            <h1>Memory</h1>
+            <div className="topbar__brand-meta">
+              <StatusPill label={mobileSyncLabel} tone={syncTone} />
+            </div>
+          </div>
         </div>
 
-        <label className="search-field topbar__search" htmlFor="global-search">
-          <span>Buscar</span>
-          <input
-            id="global-search"
-            type="search"
-            placeholder="Título, conteúdo, data, tag ou entidade"
-            value={query}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => onQueryChange(event.target.value)}
-          />
-        </label>
+        <div className="topbar__mobile-actions">
+          <label className="search-field topbar__search topbar__search--mobile" htmlFor="global-search">
+            <span className="sr-only">Buscar</span>
+            <input
+              id="global-search"
+              type="search"
+              placeholder="Buscar por título, tag, entidade ou data"
+              value={query}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => onQueryChange(event.target.value)}
+            />
+          </label>
+
+          <button type="button" className="toolbar-button toolbar-button--ghost topbar__filters-button" onClick={onOpenFilters}>
+            Filtros{activeFilterCount ? ` · ${activeFilterCount} ativos` : ''}
+          </button>
+        </div>
       </header>
     );
   }
@@ -95,11 +102,6 @@ export function TopBar({
           <button type="button" className="toolbar-button" onClick={onOpenFilters}>
             Filtros{activeFilterCount ? ` (${activeFilterCount})` : ''}
           </button>
-          {inspectorAvailable ? (
-            <button type="button" className="toolbar-button toolbar-button--ghost" onClick={onOpenInspector}>
-              Detalhe
-            </button>
-          ) : null}
         </div>
       </div>
     </header>
