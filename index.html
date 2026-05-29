@@ -3,55 +3,65 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#2A1F38" />
-    <title>memory-lp — Melissa's Holographic diary</title>
+    <meta name="theme-color" content="#140F1B" />
+    <title>memory-lp — Diário da Melissa</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="bg-orbit bg-orbit--one"></div>
     <div class="bg-orbit bg-orbit--two"></div>
+
     <div class="page-shell">
       <header class="hero">
-        <div class="eyebrow">Melissa · Holographic · read-only</div>
+        <div class="eyebrow">Diário da Melissa · somente leitura</div>
         <div class="hero__grid">
-          <div>
-            <h1>Memórias que não precisam sumir quando a conversa acaba.</h1>
-            <p class="hero__lede">Um diário móvel primeiro, bonito no desktop também, para folhear as memórias do Holographic com calma, sem a estética de planilha triste.</p>
+          <div class="hero__copy">
+            <h1>Memórias para abrir com calma.</h1>
+            <p class="hero__lede">
+              Um caderno vivo da Melissa: notas, decisões e lembranças organizadas para leitura
+              confortável no celular e no desktop.
+            </p>
           </div>
-          <div class="hero__card">
-            <p class="hero__label">Snapshot</p>
+
+          <aside class="hero__card" aria-label="Resumo do diário">
+            <p class="hero__label">Disponível agora</p>
             <p class="hero__value" id="hero-count">—</p>
-            <p class="hero__note">versão somente leitura, publicada no GitHub Pages</p>
+            <p class="hero__note">memórias no diário</p>
             <p class="hero__sync" id="sync-status">sincronizando…</p>
-          </div>
+          </aside>
         </div>
       </header>
 
       <main class="layout">
-        <section class="pane pane--list">
+        <section class="pane pane--list" aria-label="Lista de memórias">
           <div class="toolbar">
-            <label class="search-wrap" aria-label="Pesquisar memórias">
+            <label class="search-wrap" for="search">
               <span>Buscar</span>
-              <input id="search" type="search" placeholder="voz, brand, SDD, kanban..." />
+              <input id="search" type="search" placeholder="Palavra, tema ou data" />
             </label>
-            <div class="stats" id="stats"></div>
+            <p class="toolbar__hint">Toque em uma memória para abrir a leitura.</p>
+            <div class="filter-row" id="filters" aria-label="Filtros de categoria"></div>
           </div>
-          <div class="filter-row" id="filters" aria-label="Filtros de categoria"></div>
+
           <div class="memory-list" id="memory-list"></div>
         </section>
 
-        <aside class="pane pane--detail" id="detail-panel">
+        <aside class="pane pane--detail" id="detail-panel" aria-label="Leitura da memória">
           <div class="detail-placeholder">
-            <p class="detail-placeholder__eyebrow">Escolhe uma memória</p>
-            <h2>Vai aparecer aqui</h2>
-            <p>Selecione uma nota à esquerda para abrir a leitura confortável, com o texto inteiro e os metadados que importam.</p>
+            <p class="detail-placeholder__eyebrow">Leitura</p>
+            <h2>Escolha uma memória</h2>
+            <p>Toque em um cartão para abrir o texto completo aqui.</p>
           </div>
         </aside>
       </main>
     </div>
+
     <div class="detail-backdrop" id="detail-backdrop" hidden></div>
     <script src="./app.js" type="module"></script>
   </body>
