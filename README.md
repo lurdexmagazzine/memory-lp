@@ -1,12 +1,20 @@
 # memory-lp
 
-Arquivo editorial público da Lurdex em React + Vite.
+Visor público da Lurdex para explorar memórias, diário e relações em modo somente leitura.
 
-## O que este app faz
+## O que há aqui
 
-- lê o snapshot exportado do Holographic em `data/memories.json`
-- publica a leitura como app estático no GitHub Pages
-- organiza a interface como uma capa editorial, uma leitura em destaque e um índice abaixo, tudo em modo somente leitura
+- *Brain View*: mapa relacional com nós, clusters e seleção de memórias
+- *Diary View*: timeline com busca, filtros e cards compactos
+- *Inspector*: painel de detalhes com conteúdo, metadados, tags, entidades e relações
+- snapshot exportado do Holographic em `data/memories.json`
+- publicação estática no GitHub Pages via `docs/`
+
+## Stack
+
+- React
+- TypeScript
+- Vite
 
 ## Desenvolvimento
 
@@ -15,10 +23,13 @@ npm install
 npm run dev
 ```
 
-## Build
+## Checks
 
 ```bash
+npm run typecheck
 npm run build
 ```
+
+## Build
 
 O build copia `data/memories.json` para `public/data/memories.json` e gera o site final em `docs/`.
