@@ -1062,22 +1062,51 @@ svg {
   position: sticky;
   bottom: 0;
   z-index: 4;
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) repeat(2, minmax(0, 1fr));
-  gap: 0.45rem;
-  padding: 0.55rem 0 0.4rem;
+  padding: 0.55rem 0 0.45rem;
   margin-top: 0.2rem;
   background: linear-gradient(180deg, rgba(255, 250, 242, 0.82), rgba(244, 236, 224, 0.98));
 }
 
-.reading-pane__mobile-nav .ui-button {
-  width: 100%;
+.reading-pane__mobile-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   min-width: 0;
-  padding-inline: 0.55rem;
 }
 
-.reading-pane__mobile-nav .ui-button--ghost {
-  background: rgba(255, 255, 255, 0.88);
+.reading-pane__mobile-nav-back {
+  flex: 0 0 auto;
+  min-width: 5.25rem;
+}
+
+.reading-pane__mobile-nav-stepper {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  padding: 0.2rem 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--shadow-sm);
+}
+
+.reading-pane__mobile-nav-step {
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+  padding-inline: 0.4rem;
+}
+
+.reading-pane__mobile-nav-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 0.15rem 0.15rem;
+  background: var(--line);
+}
+
+.reading-pane__mobile-nav .ui-button {
+  min-width: 0;
 }
 
 .reading-footnote {

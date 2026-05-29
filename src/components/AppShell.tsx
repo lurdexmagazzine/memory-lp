@@ -11,7 +11,7 @@ import {
   formatTimeLabel,
   paragraphs,
 } from '../lib/memory';
-import { presentExcerpt, presentLabel, presentShortTitle, presentSummary, presentTitle } from '../lib/presentation';
+import { presentDiarySummary, presentDiaryTitle, presentExcerpt, presentLabel, presentShortTitle, presentSummary, presentTitle } from '../lib/presentation';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -613,7 +613,7 @@ function ReadingDocument({
 }) {
   const displayTitle = compact ? presentShortTitle(record.title) : presentTitle(record.title);
   const showSummary = shouldShowReadingSummary(record);
-  const visibleRelated = compact ? related.slice(0, 3) : related;
+  const visibleRelated = compact ? [] : related;
 
   if (compact) {
     return (
@@ -622,7 +622,7 @@ function ReadingDocument({
           <header className="space-y-3">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--mauve-soft)] bg-[color:var(--surface-strong)]/78 px-2.5 py-1 text-[0.68rem] uppercase tracking-[0.18em] text-muted-foreground">
-                Fragmento aberto
+                Diário do dia
               </span>
               <span aria-hidden="true" className="h-px flex-1 rounded-full bg-[linear-gradient(90deg,rgba(124,112,143,0.2),rgba(111,89,68,0.06),transparent)]" />
             </div>
@@ -640,11 +640,9 @@ function ReadingDocument({
           </header>
 
           <section className="reading-section space-y-3">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Anotação</p>
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Hoje</p>
             <div className="space-y-4 text-[0.96rem] leading-7 text-foreground/88">
-              {paragraphs(record.content).map((paragraph, index) => (
-                <p key={`${record.id}-paragraph-${index}`}>{paragraph}</p>
-              ))}
+              <p>{presentDiarySummary(record, 260)}</p>
             </div>
           </section>
 
@@ -683,22 +681,6 @@ function ReadingDocument({
 
           <Separator className="bg-border/70" />
 
-          <section className="reading-section space-y-3">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Ecos relacionados</p>
-            {visibleRelated.length ? (
-              <div className="grid gap-3">
-                {visibleRelated.map(({ record: relatedRecord, relation }) => (
-                  <RelatedEchoItem key={relatedRecord.id} record={relatedRecord} relation={relation} onSelect={onSelectRecord} />
-                ))}
-              </div>
-            ) : (
-              <EmptyPanel
-                eyebrow="Ecos relacionados"
-                title="Sem ecos ainda"
-                description="Quando surgirem relações confiáveis, elas aparecem aqui como pequenos apoios à leitura."
-              />
-            )}
-          </section>
         </div>
       </article>
     );
@@ -936,36 +918,28 @@ function MobileReadingOverlay({
         showCloseButton={false}
         className="reading-pane--mobile-fullscreen reading-pane--mobile-fantasy !left-0 !right-0 !bottom-0 !top-0 !h-[100dvh] !w-[100vw] !max-w-none !rounded-none !border-0 !p-0 flex flex-col bg-[color:var(--bg)]"
       >
-        <SheetHeader className="reading-pane__mobile-header border-b border-border/70 bg-[color:var(--surface)]/92 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-[color:var(--surface)]/82 sm:px-5">
+        <SheetHeader className="reading-pane__mobile-header border-b border-border/70 bg-[color:var(--surface)]/92 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-[color:var(--surface)]/82 sm:px-5">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-2">
-              <div className="reading-pane__mobile-ornament" aria-hidden="true">
-                <span />
-                <span />
-              </div>
-              <SheetTitle className="sr-only">Leitura da memória</SheetTitle>
-              <SheetDescription className="sr-only">Página aberta em modo móvel.</SheetDescription>
+              <SheetTitle className="sr-only">Diário aberto</SheetTitle>
+              <SheetDescription className="sr-only">Diário aberto em modo móvel.</SheetDescription>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em]">
-                  Leitura
+                  Diário
                 </Badge>
                 <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                   {pageLabel}
                 </Badge>
               </div>
               <h2 className="font-serif text-[clamp(1.38rem,6vw,1.95rem)] leading-[1.08] text-foreground [overflow-wrap:anywhere]" title={record?.title ?? undefined}>
-                {record ? presentShortTitle(record.title) : 'Selecione uma memória'}
+                {record ? presentDiaryTitle(record) : 'Selecione uma memória'}
               </h2>
-              {record && shouldShowReadingSummary(record) ? (
-                <p className="max-w-4xl text-sm leading-7 text-muted-foreground">{presentSummary(record.summary, 120)}</p>
-              ) : (
-                <p className="max-w-4xl text-sm leading-7 text-muted-foreground">A leitura abre aqui como uma página de diário.</p>
-              )}
             </div>
 
             <SheetClose asChild>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="Fechar leitura">
-                <XIcon />
+              <Button type="button" variant="outline" size="sm" className="rounded-full px-3 text-[0.8rem] text-muted-foreground shadow-sm">
+                Fechar
+                <XIcon data-icon="inline-end" />
               </Button>
             </SheetClose>
           </div>
@@ -986,19 +960,22 @@ function MobileReadingOverlay({
         </ScrollArea>
 
         <SheetFooter className="reading-pane__mobile-nav border-t border-border/70 bg-[color:var(--surface)]/96 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:px-5">
-          <div className="flex w-full items-center gap-2">
-            <Button type="button" variant="outline" className="flex-1 rounded-full" onClick={onBack}>
+          <div className="reading-pane__mobile-nav-row">
+            <Button type="button" variant="outline" size="sm" className="reading-pane__mobile-nav-back rounded-full" onClick={onBack}>
               <ArrowLeftIcon data-icon="inline-start" />
               Voltar
             </Button>
-            <Button type="button" variant="outline" className="flex-1 rounded-full" onClick={onPrevious} disabled={!hasPrevious}>
-              <ChevronLeftIcon data-icon="inline-start" />
-              Anterior
-            </Button>
-            <Button type="button" variant="outline" className="flex-1 rounded-full" onClick={onNext} disabled={!hasNext}>
-              <ChevronRightIcon data-icon="inline-start" />
-              Próxima
-            </Button>
+            <div className="reading-pane__mobile-nav-stepper">
+              <Button type="button" variant="ghost" size="sm" className="reading-pane__mobile-nav-step" onClick={onPrevious} disabled={!hasPrevious}>
+                <ChevronLeftIcon data-icon="inline-start" />
+                Anterior
+              </Button>
+              <span aria-hidden="true" className="reading-pane__mobile-nav-divider" />
+              <Button type="button" variant="ghost" size="sm" className="reading-pane__mobile-nav-step" onClick={onNext} disabled={!hasNext}>
+                Próxima
+                <ChevronRightIcon data-icon="inline-end" />
+              </Button>
+            </div>
           </div>
         </SheetFooter>
       </SheetContent>
@@ -1225,6 +1202,12 @@ function DiaryLayout({
     [selectedRecord, timelineEntries],
   );
   const pageLabel = selectedIndex >= 0 ? `Página ${selectedIndex + 1} de ${timelineEntries.length}` : 'Página —';
+  const selectedDayKey = selectedRecord?.createdAtMs ? new Date(selectedRecord.createdAtMs).toISOString().slice(0, 10) : null;
+  const selectedDayGroup = useMemo(
+    () => (selectedDayKey ? timelineGroups.find((group) => group.key === selectedDayKey) ?? null : null),
+    [selectedDayKey, timelineGroups],
+  );
+  const mobilePageLabel = selectedDayGroup ? `${selectedDayGroup.label} · ${selectedDayGroup.entries.length} fragmentos` : pageLabel;
   const previousEntry = selectedIndex > 0 ? timelineEntries[selectedIndex - 1] : null;
   const nextEntry = selectedIndex >= 0 && selectedIndex < timelineEntries.length - 1 ? timelineEntries[selectedIndex + 1] : null;
   const goPrevious = () => {
@@ -1282,7 +1265,7 @@ function DiaryLayout({
         open={compact && mobileView === 'reading'}
         record={selectedRecord}
         related={relatedRecords}
-        pageLabel={pageLabel}
+        pageLabel={mobilePageLabel}
         hasPrevious={Boolean(previousEntry)}
         hasNext={Boolean(nextEntry)}
         onBack={onBackToIndex}
