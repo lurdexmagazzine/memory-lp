@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, type RefObject } from 'react';
-import type { AppSurface, DiaryGroup, FacetOption, MemoryEntry, MemoryFilters, MemoryRelation } from '../types';
+import { useEffect, useMemo, useRef, type ReactNode, type RefObject, type UIEvent } from 'react';
+import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, FilterIcon, SearchIcon, SlidersHorizontalIcon, XIcon } from 'lucide-react';
+import type { AppSurface, DiaryEntry, DiaryGroup, FacetOption, MemoryEntry, MemoryFilters, MemoryRelation } from '../types';
 import type { FacetGroups } from '../lib/memory';
 import {
   CATEGORY_LABELS,
@@ -10,8 +11,15 @@ import {
   formatTimeLabel,
   paragraphs,
 } from '../lib/memory';
-import { ChipButton, EmptyState, StatusPill, cx } from './common';
-import type { PillTone } from './common';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 function relationLabel(kind: MemoryRelation['kind']): string {
   switch (kind) {
@@ -38,10 +46,6 @@ type TimelineAnchor = {
   itemTop: number;
 };
 
-function escapeAttributeValue(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-}
-
 function compactTags(tags: string[], maxVisible = 2): { visible: string[]; hidden: number } {
   return {
     visible: tags.slice(0, maxVisible),
@@ -49,8 +53,33 @@ function compactTags(tags: string[], maxVisible = 2): { visible: string[]; hidde
   };
 }
 
-function resultLabel(visibleCount: number): string {
-  return `${visibleCount} ${visibleCount === 1 ? 'resultado' : 'resultados'}`;
+function escapeAttributeValue(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function EmptyPanel({
+  eyebrow,
+  title,
+  description,
+  action,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <Card size="sm" className="!gap-0 !py-0 bg-[color:var(--surface)]/90 shadow-sm">
+      <CardHeader className="gap-2 px-4 py-4">
+        <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">{eyebrow}</p>
+        <h3 className="font-serif text-base text-foreground">{title}</h3>
+      </CardHeader>
+      <CardContent className="px-4 pb-4">
+        <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+        {action ? <div className="mt-4 flex flex-wrap gap-2">{action}</div> : null}
+      </CardContent>
+    </Card>
+  );
 }
 
 function SurfaceTabs({
@@ -61,147 +90,121 @@ function SurfaceTabs({
   onSurfaceChange: (surface: AppSurface) => void;
 }) {
   return (
-    <div className="surface-tabs" role="tablist" aria-label="Memórias e diário">
-      <button
-        type="button"
-        className={cx('surface-tab', surface === 'memories' && 'is-active')}
-        aria-pressed={surface === 'memories'}
-        onClick={() => onSurfaceChange('memories')}
+    <Tabs value={surface} onValueChange={(value) => onSurfaceChange(value as AppSurface)} className="w-full">
+      <TabsList
+        variant="line"
+        className="w-full justify-start gap-6 border-b border-border/70 bg-transparent p-0"
       >
-        Memórias
-      </button>
-      <button
-        type="button"
-        className={cx('surface-tab', surface === 'diary' && 'is-active')}
-        aria-pressed={surface === 'diary'}
-        onClick={() => onSurfaceChange('diary')}
-      >
-        Diário
-      </button>
-    </div>
+        <TabsTrigger
+          value="memories"
+          className="h-auto rounded-none border-0 bg-transparent px-0 py-3 text-sm text-muted-foreground shadow-none data-active:bg-transparent data-active:text-foreground data-active:shadow-none"
+        >
+          Memórias
+        </TabsTrigger>
+        <TabsTrigger
+          value="diary"
+          className="h-auto rounded-none border-0 bg-transparent px-0 py-3 text-sm text-muted-foreground shadow-none data-active:bg-transparent data-active:text-foreground data-active:shadow-none"
+        >
+          Diário
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
   );
 }
 
-function IndexToolbar({
-  query,
-  onQueryChange,
-  onOpenFilters,
-  activeFilterCount,
-  activeFilterSummary,
-  resultLabelText,
-  surface,
-  onSurfaceChange,
-  syncLabel,
-  syncTone,
-  compact,
-}: {
-  query: string;
-  onQueryChange: (value: string) => void;
-  onOpenFilters: () => void;
-  activeFilterCount: number;
-  activeFilterSummary: string[];
-  resultLabelText: string;
-  surface: AppSurface;
-  onSurfaceChange: (surface: AppSurface) => void;
-  syncLabel: string;
-  syncTone: PillTone;
-  compact: boolean;
-}) {
-  return (
-    <header className={cx('index-toolbar', compact && 'index-toolbar--compact')}>
-      <div className="index-toolbar__top">
-        <div className="index-toolbar__brand">
-          <h1>Diário</h1>
-          <StatusPill label={syncLabel} tone={syncTone} />
-        </div>
-        <p className="index-toolbar__count">{resultLabelText}</p>
-      </div>
-
-      <SurfaceTabs surface={surface} onSurfaceChange={onSurfaceChange} />
-
-      <div className="index-toolbar__controls">
-        <label className="search-field" htmlFor="memory-search">
-          <span>Buscar</span>
-          <input
-            id="memory-search"
-            type="search"
-            placeholder="Título, conteúdo, tag, entidade ou data"
-            value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            autoComplete="off"
-          />
-        </label>
-
-        <button type="button" className="ui-button ui-button--ghost index-toolbar__filters" onClick={onOpenFilters}>
-          Filtros{activeFilterCount ? ` · ${activeFilterCount}` : ''}
-        </button>
-      </div>
-
-      <div className="index-toolbar__meta">
-        <p className="index-toolbar__summary">
-          {activeFilterSummary.length ? activeFilterSummary.join(' · ') : 'Fragmentos por data, com leitura em camadas.'}
-        </p>
-      </div>
-    </header>
-  );
-}
-
-function FragmentItem({
-  record,
+function FragmentCard({
+  entry,
   active,
   compact,
   onSelect,
   onPickTag,
   onBeforeSelect,
 }: {
-  record: MemoryEntry;
+  entry: DiaryEntry;
   active: boolean;
   compact: boolean;
   onSelect: () => void;
   onPickTag: (value: string) => void;
   onBeforeSelect: (node: HTMLElement) => void;
 }) {
-  const tags = compactTags(record.tags, 2);
+  const tags = compactTags(entry.tags, 2);
 
   return (
-    <article className={cx('memory-list-item', active && 'is-active')}>
-      <button
-        type="button"
-        className="memory-list-item__body"
-        data-memory-id={record.id}
-        onPointerDown={(event) => {
-          if (compact) event.preventDefault();
-          onBeforeSelect(event.currentTarget);
-        }}
-        onClick={(event) => {
-          if (compact) event.currentTarget.blur();
-          onBeforeSelect(event.currentTarget);
-          onSelect();
-        }}
-        aria-current={active ? 'true' : undefined}
+    <button
+      type="button"
+      data-memory-id={entry.memoryId}
+      data-active={active ? 'true' : undefined}
+      className="group relative block w-full text-left outline-none"
+      onPointerDown={(event) => {
+        if (compact) event.preventDefault();
+        onBeforeSelect(event.currentTarget);
+      }}
+      onClick={(event) => {
+        if (compact) event.currentTarget.blur();
+        onBeforeSelect(event.currentTarget);
+        onSelect();
+      }}
+      aria-current={active ? 'true' : undefined}
+    >
+      <span
+        aria-hidden="true"
+        className="absolute left-0 top-5 bottom-5 w-1 rounded-r-full bg-[color:var(--mauve)] opacity-0 transition-opacity group-data-[active=true]:opacity-100"
+      />
+      <Card
+        size="sm"
+        className={cn(
+          '!gap-0 !py-0 overflow-hidden border-border/70 bg-[color:var(--surface)]/96 transition-all',
+          active
+            ? 'ring-1 ring-[color:var(--line-strong)] shadow-[0_12px_28px_rgba(28,24,18,0.08)]'
+            : 'shadow-sm hover:bg-[color:var(--surface-strong)]/85 hover:shadow-md',
+        )}
       >
-        <div className="memory-list-item__top">
-          <span className="memory-list-item__date">
-            {formatShortDateLabel(record.createdAtMs)} · {sourceLabel(record.source)}
-          </span>
-        </div>
+        <CardHeader className="gap-2 px-4 pt-4 pb-2 md:px-5">
+          <div className="flex flex-wrap items-center gap-2 text-[0.72rem] uppercase tracking-[0.22em] text-muted-foreground">
+            <span>{formatShortDateLabel(entry.createdAtMs)}</span>
+            <span aria-hidden="true">·</span>
+            <span>{sourceLabel(entry.source)}</span>
+          </div>
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="min-w-0 font-serif text-[1.05rem] leading-snug text-foreground md:text-[1.1rem]">{entry.title}</h3>
+            <Badge variant="outline" className="rounded-full px-2.5 py-0.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+              {IMPORTANCE_LABELS[entry.importance]}
+            </Badge>
+          </div>
+        </CardHeader>
 
-        <h3 className="memory-list-item__title">{record.title}</h3>
-        <p className="memory-list-item__excerpt">{record.summary}</p>
+        <CardContent className="px-4 pb-3 md:px-5">
+          <p className="line-clamp-2 text-sm leading-6 text-foreground/84">{entry.excerpt}</p>
+        </CardContent>
 
-        <div className="memory-list-item__meta">
-          <span>{CATEGORY_LABELS[record.category]}</span>
-          <span>{IMPORTANCE_LABELS[record.importance]}</span>
-        </div>
-      </button>
-
-      <div className="memory-list-item__chips" aria-label="Tags da memória">
-        {tags.visible.map((tag) => (
-          <ChipButton key={`${record.id}-tag-${tag}`} label={tag} active={false} onClick={() => onPickTag(tag)} />
-        ))}
-        {tags.hidden > 0 ? <span className="memory-list-item__more">+{tags.hidden}</span> : null}
-      </div>
-    </article>
+        <CardFooter className="flex flex-wrap items-center gap-2 border-t border-border/60 bg-transparent px-4 py-3 md:px-5">
+          <Badge variant="secondary" className="rounded-full px-2.5 py-0.5 text-[11px] uppercase tracking-[0.14em]">
+            {CATEGORY_LABELS[entry.category]}
+          </Badge>
+          {tags.visible.map((tag) => (
+            <Badge key={`${entry.memoryId}-tag-${tag}`} variant="outline" className="rounded-full px-2.5 py-0.5 text-[11px]">
+              {tag}
+            </Badge>
+          ))}
+          {tags.hidden > 0 ? (
+            <Badge variant="outline" className="rounded-full px-2.5 py-0.5 text-[11px]">
+              +{tags.hidden}
+            </Badge>
+          ) : null}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {entry.entities.slice(0, 1).map((entity) => (
+              <Badge
+                key={`${entry.memoryId}-entity-${entity}`}
+                variant="ghost"
+                className="rounded-full px-2.5 py-0.5 text-[11px] uppercase tracking-[0.12em] text-muted-foreground"
+              >
+                {entity}
+              </Badge>
+            ))}
+          </div>
+        </CardFooter>
+      </Card>
+    </button>
   );
 }
 
@@ -223,41 +226,22 @@ function ChapterGroup({
   const totalEntries = group.entries.length;
 
   return (
-    <article className="day-group">
-      <header className="day-group__header">
-        <div className="day-group__heading">
-          <p className="day-group__eyebrow">Capítulo</p>
-          <h3>{group.label}</h3>
+    <section className="space-y-3">
+      <header className="flex items-end justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Capítulo</p>
+          <h3 className="font-serif text-xl text-foreground md:text-[1.35rem]">{group.label}</h3>
         </div>
-        <p className="day-group__count">{totalEntries} {totalEntries === 1 ? 'fragmento' : 'fragmentos'}</p>
+        <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+          {totalEntries} {totalEntries === 1 ? 'fragmento' : 'fragmentos'}
+        </Badge>
       </header>
 
-      <div className="day-group__list">
+      <div className="space-y-3">
         {group.entries.map((entry) => (
-          <FragmentItem
+          <FragmentCard
             key={entry.id}
-            record={{
-              id: entry.memoryId,
-              factId: null,
-              title: entry.title,
-              content: entry.excerpt,
-              category: entry.category,
-              tags: entry.tags,
-              entities: entry.entities,
-              source: entry.source,
-              trust: 0.5,
-              retrievalCount: 0,
-              helpfulCount: 0,
-              createdAt: entry.createdAtMs ? new Date(entry.createdAtMs).toISOString() : '',
-              updatedAt: entry.createdAtMs ? new Date(entry.createdAtMs).toISOString() : '',
-              createdAtMs: entry.createdAtMs,
-              updatedAtMs: entry.createdAtMs,
-              importance: entry.importance,
-              importanceScore: 0,
-              relationCount: 0,
-              summary: entry.excerpt,
-              searchText: '',
-            }}
+            entry={entry}
             compact={compact}
             active={entry.memoryId === selectedId}
             onSelect={() => onSelectRecord(entry.memoryId)}
@@ -266,7 +250,7 @@ function ChapterGroup({
           />
         ))}
       </div>
-    </article>
+    </section>
   );
 }
 
@@ -280,7 +264,6 @@ function DiaryIndex({
   surface,
   onSurfaceChange,
   syncLabel,
-  syncTone,
   compact,
   timelineGroups,
   selectedId,
@@ -304,7 +287,6 @@ function DiaryIndex({
   surface: AppSurface;
   onSurfaceChange: (surface: AppSurface) => void;
   syncLabel: string;
-  syncTone: PillTone;
   compact: boolean;
   timelineGroups: DiaryGroup[];
   selectedId: string | null;
@@ -337,7 +319,7 @@ function DiaryIndex({
 
   useEffect(() => {
     if (compact || !selectedId || restoreAnchor) return;
-    const activeButton = scrollRef.current?.querySelector<HTMLElement>('.memory-list-item.is-active .memory-list-item__body');
+    const activeButton = scrollRef.current?.querySelector<HTMLElement>('.group[data-active="true"]');
     activeButton?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [compact, restoreAnchor, selectedId, timelineGroups.length]);
 
@@ -376,108 +358,234 @@ function DiaryIndex({
   }, [compact, onRestoreComplete, restoreAnchor, restoreFocusRef, scrollRef]);
 
   return (
-    <section className={cx('index-pane', compact && 'index-pane--compact', className)} aria-label="Índice de memórias" aria-hidden={ariaHidden ? 'true' : undefined}>
-      <IndexToolbar
-        query={query}
-        onQueryChange={onQueryChange}
-        onOpenFilters={onOpenFilters}
-        activeFilterCount={activeFilterCount}
-        activeFilterSummary={activeFilterSummary}
-        resultLabelText={resultLabelText}
-        surface={surface}
-        onSurfaceChange={onSurfaceChange}
-        syncLabel={syncLabel}
-        syncTone={syncTone}
-        compact={compact}
-      />
+    <section
+      className={cn(
+        'flex h-dvh flex-col border-border/70 bg-[color:var(--surface)]/92',
+        compact ? 'border-r-0' : 'md:border-r md:border-border/70',
+        className,
+      )}
+      aria-label="Índice de memórias"
+      aria-hidden={ariaHidden ? 'true' : undefined}
+    >
+      <header className="border-b border-border/70 bg-[color:var(--surface)]/90 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-[color:var(--surface)]/80 sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Diário</p>
+            <h1 className="font-serif text-[1.9rem] leading-none text-foreground md:text-[2.1rem]">memory-lp</h1>
+            <p className="text-sm leading-6 text-muted-foreground">{resultLabelText}</p>
+          </div>
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+            {syncLabel}
+          </Badge>
+        </div>
 
-      <div
-        ref={scrollRef}
-        className="index-pane__scroll"
-        tabIndex={-1}
-        onScroll={(event) => onScroll(event.currentTarget.scrollTop)}
+        <div className="mt-4">
+          <SurfaceTabs surface={surface} onSurfaceChange={onSurfaceChange} />
+        </div>
+
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+          <label className="relative flex-1">
+            <span className="sr-only">Buscar</span>
+            <SearchIcon
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              id="memory-search"
+              type="search"
+              placeholder="Título, conteúdo, tag, entidade ou data"
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              autoComplete="off"
+              className="h-10 rounded-full border-border/70 bg-background/70 pl-9"
+            />
+          </label>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 rounded-full border-border/70 px-4 shadow-sm"
+            onClick={onOpenFilters}
+          >
+            <SlidersHorizontalIcon data-icon="inline-start" />
+            Filtros
+            {activeFilterCount ? (
+              <Badge variant="secondary" className="ml-2 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]">
+                {activeFilterCount}
+              </Badge>
+            ) : null}
+          </Button>
+        </div>
+
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          {activeFilterSummary.length ? activeFilterSummary.join(' · ') : 'Fragmentos por data, com leitura em camadas.'}
+        </p>
+      </header>
+
+      <ScrollArea
+        className="flex-1 min-h-0"
+        viewportRef={scrollRef}
+        onViewportScroll={(event: UIEvent<HTMLDivElement>) => onScroll(event.currentTarget.scrollTop)}
       >
-        {timelineGroups.length ? (
-          <section className="timeline-stack" aria-label="Timeline do diário e das memórias">
-            {timelineGroups.map((group) => (
-              <ChapterGroup
-                key={group.key}
-                group={group}
-                selectedId={selectedId}
-                onSelectRecord={onSelectRecord}
-                onPickTag={onPickTag}
-                onBeforeSelectRecord={captureAnchorFromNode}
-                compact={compact}
-              />
-            ))}
-          </section>
-        ) : (
-          <EmptyState
-            eyebrow="Índice do diário"
-            title="Nenhum fragmento no recorte atual"
-            description="A timeline aparece quando a busca ou os filtros encontram memórias datadas."
-          />
-        )}
-      </div>
+        <div className="space-y-8 px-4 py-5 sm:px-5">
+          {timelineGroups.length ? (
+            <div className="space-y-8">
+              {timelineGroups.map((group, index) => (
+                <div key={group.key} className="space-y-8">
+                  <ChapterGroup
+                    group={group}
+                    selectedId={selectedId}
+                    onSelectRecord={onSelectRecord}
+                    onPickTag={onPickTag}
+                    onBeforeSelectRecord={captureAnchorFromNode}
+                    compact={compact}
+                  />
+                  {index < timelineGroups.length - 1 ? <Separator className="bg-border/70" /> : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyPanel
+              eyebrow="Índice do diário"
+              title="Nenhum fragmento no recorte atual"
+              description="A timeline aparece quando a busca ou os filtros encontram memórias datadas."
+              action={
+                <Button type="button" variant="outline" onClick={onOpenFilters}>
+                  <FilterIcon data-icon="inline-start" />
+                  Abrir filtros
+                </Button>
+              }
+            />
+          )}
+        </div>
+      </ScrollArea>
     </section>
   );
 }
 
-function MemoryMarks({ record, pageLabel }: { record: MemoryEntry; pageLabel: string }) {
-  return (
-    <section className="reading-section" aria-label="Marcas da memória">
-      <p className="reading-section__eyebrow">Marcas</p>
-      <div className="reading-metadata">
-        <StatusPill label={`Página · ${pageLabel}`} tone="neutral" />
-        <StatusPill label={`Data · ${formatDateLabel(record.createdAtMs)} · ${formatTimeLabel(record.createdAtMs)}`} tone="neutral" />
-        <StatusPill label={`Categoria · ${CATEGORY_LABELS[record.category]}`} tone="accent" />
-        <StatusPill label={`Origem · ${sourceLabel(record.source)}`} tone="neutral" />
-        <StatusPill
-          label={`Importância · ${IMPORTANCE_LABELS[record.importance]}`}
-          tone={record.importance === 'anchor' || record.importance === 'high' ? 'warning' : 'good'}
-        />
-      </div>
-    </section>
-  );
-}
-
-function RelatedEchoes({
-  items,
+function RelatedEchoItem({
+  record,
+  relation,
   onSelect,
 }: {
-  items: Array<{ record: MemoryEntry; relation: MemoryRelation }>;
+  record: MemoryEntry;
+  relation: MemoryRelation;
   onSelect: (id: string) => void;
 }) {
-  if (!items.length) {
-    return (
-      <EmptyState
-        eyebrow="Ecos relacionados"
-        title="Sem ecos ainda"
-        description="Quando surgirem relações confiáveis, elas aparecem aqui como pequenos apoios à leitura."
-      />
-    );
-  }
-
   return (
-    <section className="reading-section">
-      <p className="reading-section__eyebrow">Ecos relacionados</p>
-      <div className="related-list">
-        {items.map(({ record, relation }) => (
-          <button type="button" className="related-entry" key={record.id} onClick={() => onSelect(record.id)}>
-            <div className="related-entry__top">
-              <strong>{record.title}</strong>
-              <StatusPill label={relationLabel(relation.kind)} tone="neutral" />
-            </div>
-            <p>{record.summary}</p>
-            <span className="related-entry__meta">peso {relation.weight.toFixed(1)} · {relation.evidence.join(' · ')}</span>
-          </button>
-        ))}
+    <button
+      type="button"
+      className="group flex w-full flex-col gap-2 rounded-[1.4rem] border border-border/70 bg-background/35 p-4 text-left shadow-sm transition hover:-translate-y-[1px] hover:bg-background/55 hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50"
+      onClick={() => onSelect(record.id)}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <strong className="font-serif text-base text-foreground">{record.title}</strong>
+        <Badge variant="outline" className="rounded-full px-2.5 py-0.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+          {relationLabel(relation.kind)}
+        </Badge>
       </div>
-    </section>
+      <p className="text-sm leading-6 text-foreground/82">{record.summary}</p>
+      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+        peso {relation.weight.toFixed(1)} · {relation.evidence.join(' · ')}
+      </p>
+    </button>
   );
 }
 
-function ReadingPage({
+function ReadingDocument({
+  record,
+  related,
+  pageLabel,
+  onSelectRecord,
+}: {
+  record: MemoryEntry;
+  related: Array<{ record: MemoryEntry; relation: MemoryRelation }>;
+  pageLabel: string;
+  onSelectRecord: (id: string) => void;
+}) {
+  return (
+    <Card className="mx-auto w-full max-w-4xl !gap-0 !py-0 overflow-hidden border-border/70 bg-[color:var(--surface)]/96 shadow-[0_18px_48px_rgba(28,24,18,0.08)]">
+      <CardHeader className="gap-3 border-b border-border/60 px-5 py-4 md:px-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em]">
+            {pageLabel}
+          </Badge>
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+            {CATEGORY_LABELS[record.category]}
+          </Badge>
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+            {sourceLabel(record.source)}
+          </Badge>
+        </div>
+        <p className="text-sm leading-6 text-muted-foreground">Leitura íntima, sem ruído de dashboard ou lista corporativa.</p>
+      </CardHeader>
+
+      <CardContent className="space-y-6 px-5 py-5 md:px-6">
+        <section className="space-y-3">
+          <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Anotação</p>
+          <div className="space-y-4 text-[0.98rem] leading-8 text-foreground/88">
+            {paragraphs(record.content).map((paragraph, index) => (
+              <p key={`${record.id}-paragraph-${index}`}>{paragraph}</p>
+            ))}
+          </div>
+        </section>
+
+        <Separator className="bg-border/70" />
+
+        <section className="space-y-3">
+          <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Marcas</p>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em]">
+              Data · {formatDateLabel(record.createdAtMs)} · {formatTimeLabel(record.createdAtMs)}
+            </Badge>
+            <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+              Importância · {IMPORTANCE_LABELS[record.importance]}
+            </Badge>
+            {record.tags.length ? (
+              record.tags.map((tag) => (
+                <Badge key={`${record.id}-tag-${tag}`} variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em]">
+                  {tag}
+                </Badge>
+              ))
+            ) : (
+              <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                Sem tags
+              </Badge>
+            )}
+            {record.entities.length ? (
+              record.entities.map((entity) => (
+                <Badge key={`${record.id}-entity-${entity}`} variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em]">
+                  {entity}
+                </Badge>
+              ))
+            ) : null}
+          </div>
+        </section>
+
+        <Separator className="bg-border/70" />
+
+        <section className="space-y-3">
+          <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Ecos relacionados</p>
+          {related.length ? (
+            <div className="grid gap-3">
+              {related.map(({ record: relatedRecord, relation }) => (
+                <RelatedEchoItem key={relatedRecord.id} record={relatedRecord} relation={relation} onSelect={onSelectRecord} />
+              ))}
+            </div>
+          ) : (
+            <EmptyPanel
+              eyebrow="Ecos relacionados"
+              title="Sem ecos ainda"
+              description="Quando surgirem relações confiáveis, elas aparecem aqui como pequenos apoios à leitura."
+            />
+          )}
+        </section>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReadingPane({
   record,
   related,
   mobile,
@@ -501,39 +609,51 @@ function ReadingPage({
   onNext: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const mobileBackRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
   }, [record?.id]);
 
-  useEffect(() => {
-    if (!mobile || !record) return;
-    mobileBackRef.current?.focus({ preventScroll: true });
-  }, [mobile, record?.id]);
-
-  useEffect(() => {
-    if (!mobile || !record) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      onBack();
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [mobile, onBack, record?.id]);
-
   if (!record) {
     return (
-      <section className={cx('reading-pane', mobile && 'reading-pane--mobile-fullscreen')} aria-label="Leitura da memória">
-        <div className="reading-pane__scroll" ref={scrollRef}>
-          <EmptyState
+      <section className="flex h-dvh min-h-0 flex-col bg-[color:var(--bg-2)]/55">
+        <header className="border-b border-border/70 bg-[color:var(--surface)]/90 px-5 py-5 backdrop-blur supports-[backdrop-filter]:bg-[color:var(--surface)]/80">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em]">
+                  Leitura
+                </Badge>
+                <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Página vazia
+                </Badge>
+              </div>
+              <h2 className="font-serif text-3xl text-foreground">Selecione uma memória</h2>
+              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+                A entrada abre aqui como uma página de diário com data, conteúdo e ecos ao fim.
+              </p>
+            </div>
+            {!mobile ? (
+              <div className="flex flex-col gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={onPrevious} disabled={!hasPrevious}>
+                  <ChevronLeftIcon data-icon="inline-start" />
+                  Anterior
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={onNext} disabled={!hasNext}>
+                  <ChevronRightIcon data-icon="inline-start" />
+                  Próxima
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        </header>
+
+        <div className="flex min-h-0 flex-1 items-center justify-center p-5">
+          <EmptyPanel
             eyebrow="Leitura"
-            title="Selecione uma memória"
-            description="A entrada abre aqui como uma página de diário com data, conteúdo e ecos ao fim."
-            action={mobile ? <button type="button" className="ui-button" onClick={onBack}>Voltar</button> : undefined}
+            title="Nada aberto"
+            description="Escolha um fragmento no índice para ler a página completa."
+            action={mobile ? <Button type="button" onClick={onBack}><ArrowLeftIcon data-icon="inline-start" />Voltar</Button> : undefined}
           />
         </div>
       </section>
@@ -541,68 +661,187 @@ function ReadingPage({
   }
 
   return (
-    <section className={cx('reading-pane', mobile && 'reading-pane--mobile-fullscreen')} aria-label={`Leitura de ${record.title}`}>
-      <div className="reading-pane__scroll" ref={scrollRef}>
-        {!mobile ? (
-          <div className="reading-pane__desktop-nav" aria-label="Navegação da leitura">
-            <StatusPill label={pageLabel} tone="neutral" />
-            <div className="reading-pane__nav-actions">
-              <button type="button" className="ui-button ui-button--ghost" onClick={onPrevious} disabled={!hasPrevious}>
-                Anterior
-              </button>
-              <button type="button" className="ui-button ui-button--ghost" onClick={onNext} disabled={!hasNext}>
-                Próxima
-              </button>
+    <section className="flex h-dvh min-h-0 flex-col bg-[color:var(--bg-2)]/55">
+      <header className="border-b border-border/70 bg-[color:var(--surface)]/90 px-5 py-5 backdrop-blur supports-[backdrop-filter]:bg-[color:var(--surface)]/80">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em]">
+                Leitura
+              </Badge>
+              <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                {pageLabel}
+              </Badge>
             </div>
+            <h2 className="max-w-4xl font-serif text-[clamp(1.9rem,2.6vw,3rem)] leading-tight text-foreground">{record.title}</h2>
+            <p className="max-w-4xl text-sm leading-7 text-muted-foreground">{record.summary}</p>
           </div>
-        ) : null}
 
-        <header className="reading-header">
-          {mobile ? (
-            <div className="reading-header__mobile-meta">
-              <StatusPill label={pageLabel} tone="neutral" />
-              <StatusPill label={CATEGORY_LABELS[record.category]} tone="accent" />
+          {!mobile ? (
+            <div className="flex flex-col gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={onPrevious} disabled={!hasPrevious}>
+                <ChevronLeftIcon data-icon="inline-start" />
+                Anterior
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={onNext} disabled={!hasNext}>
+                <ChevronRightIcon data-icon="inline-start" />
+                Próxima
+              </Button>
             </div>
           ) : null}
-          <p className="reading-header__eyebrow">Leitura</p>
-          <h2>{record.title}</h2>
-          <p className="reading-header__summary">{record.summary}</p>
-        </header>
+        </div>
+      </header>
 
-        <MemoryMarks record={record} pageLabel={pageLabel} />
+      <ScrollArea className="flex-1 min-h-0" viewportRef={scrollRef}>
+        <div className="px-4 py-5 sm:px-5 lg:px-6">
+          <ReadingDocument record={record} related={related} pageLabel={pageLabel} onSelectRecord={onSelectRecord} />
+        </div>
+      </ScrollArea>
+    </section>
+  );
+}
 
-        <section className="reading-section">
-          <p className="reading-section__eyebrow">Anotação</p>
-          <div className="reading-content">
-            {paragraphs(record.content).map((paragraph, index) => (
-              <p key={`${record.id}-${index}`}>{paragraph}</p>
-            ))}
-          </div>
-        </section>
-
-        <section className="reading-section">
-          <p className="reading-section__eyebrow">Marcas</p>
-          <div className="reading-chip-row">
-            {record.tags.length ? record.tags.map((tag) => <StatusPill key={`${record.id}-tag-${tag}`} label={tag} tone="accent" />) : <StatusPill label="Sem tags" tone="neutral" />}
-            {record.entities.length ? record.entities.map((entity) => <StatusPill key={`${record.id}-entity-${entity}`} label={entity} tone="neutral" />) : <StatusPill label="Sem entidades" tone="neutral" />}
-          </div>
-        </section>
-
-        <RelatedEchoes items={related} onSelect={onSelectRecord} />
-
-          {mobile ? (
-            <div className="reading-pane__mobile-nav" aria-label="Navegação da leitura">
-              <button ref={mobileBackRef} type="button" className="ui-button ui-button--ghost" onClick={onBack}>
-                Voltar
-              </button>
-              <button type="button" className="ui-button ui-button--ghost" onClick={onPrevious} disabled={!hasPrevious}>
-                Anterior
-              </button>
-              <button type="button" className="ui-button ui-button--ghost" onClick={onNext} disabled={!hasNext}>
-                Próxima
-              </button>
+function MobileReadingSheet({
+  open,
+  record,
+  related,
+  pageLabel,
+  hasPrevious,
+  hasNext,
+  onBack,
+  onSelectRecord,
+  onPrevious,
+  onNext,
+}: {
+  open: boolean;
+  record: MemoryEntry | null;
+  related: Array<{ record: MemoryEntry; relation: MemoryRelation }>;
+  pageLabel: string;
+  hasPrevious: boolean;
+  hasNext: boolean;
+  onBack: () => void;
+  onSelectRecord: (id: string) => void;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={(nextOpen: boolean) => {
+      if (!nextOpen) onBack();
+    }}>
+      <SheetContent
+        side="bottom"
+        showCloseButton={false}
+        className="!left-0 !right-0 !bottom-0 !top-0 !h-[100dvh] !w-[100vw] !max-w-none !rounded-none !border-0 !p-0 flex flex-col bg-[color:var(--bg)]"
+      >
+        <SheetHeader className="border-b border-border/70 bg-[color:var(--surface)]/92 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-[color:var(--surface)]/82 sm:px-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-2">
+              <SheetTitle className="sr-only">Leitura da memória</SheetTitle>
+              <SheetDescription className="sr-only">Página aberta em modo móvel.</SheetDescription>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em]">
+                  Leitura
+                </Badge>
+                <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {pageLabel}
+                </Badge>
+              </div>
+              <h2 className="max-w-4xl font-serif text-[clamp(1.75rem,6vw,2.45rem)] leading-tight text-foreground">
+                {record?.title ?? 'Selecione uma memória'}
+              </h2>
+              <p className="max-w-4xl text-sm leading-7 text-muted-foreground">{record?.summary ?? 'A leitura abre aqui como uma página de diário.'}</p>
             </div>
-          ) : null}
+
+            <SheetClose asChild>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="Fechar leitura">
+                <XIcon />
+              </Button>
+            </SheetClose>
+          </div>
+        </SheetHeader>
+
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="px-4 py-5 sm:px-5">
+            {record ? (
+              <ReadingDocument record={record} related={related} pageLabel={pageLabel} onSelectRecord={onSelectRecord} />
+            ) : (
+              <EmptyPanel
+                eyebrow="Leitura"
+                title="Nada aberto"
+                description="Escolha um fragmento no índice para ler a página completa."
+              />
+            )}
+          </div>
+        </ScrollArea>
+
+        <SheetFooter className="border-t border-border/70 bg-[color:var(--surface)]/96 px-4 py-3 sm:px-5">
+          <div className="flex w-full items-center gap-2">
+            <Button type="button" variant="outline" className="flex-1 rounded-full" onClick={onBack}>
+              <ArrowLeftIcon data-icon="inline-start" />
+              Voltar
+            </Button>
+            <Button type="button" variant="outline" className="flex-1 rounded-full" onClick={onPrevious} disabled={!hasPrevious}>
+              <ChevronLeftIcon data-icon="inline-start" />
+              Anterior
+            </Button>
+            <Button type="button" variant="outline" className="flex-1 rounded-full" onClick={onNext} disabled={!hasNext}>
+              <ChevronRightIcon data-icon="inline-start" />
+              Próxima
+            </Button>
+          </div>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function FilterChip({
+  option,
+  active,
+  onPick,
+}: {
+  option: FacetOption;
+  active: boolean;
+  onPick: (value: string) => void;
+}) {
+  const label = option.value === 'all' ? `Todas · ${option.count}` : `${option.label} · ${option.count}`;
+
+  return (
+    <Button
+      type="button"
+      variant={active ? 'secondary' : 'outline'}
+      size="sm"
+      className={cn('h-8 rounded-full px-3 text-xs shadow-sm', active && 'border-transparent')}
+      onClick={() => onPick(option.value)}
+    >
+      {label}
+    </Button>
+  );
+}
+
+function FilterGroup({
+  title,
+  options,
+  activeValue,
+  onPick,
+}: {
+  title: string;
+  options: FacetOption[];
+  activeValue: string | 'all';
+  onPick: (value: string) => void;
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">{title}</p>
+        <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+          {options.length}
+        </Badge>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => (
+          <FilterChip key={option.value} option={option} active={activeValue === option.value} onPick={onPick} />
+        ))}
       </div>
     </section>
   );
@@ -625,122 +864,82 @@ function FilterSheet({
   onClear: () => void;
   onClose: () => void;
 }) {
-  const closeRef = useRef<HTMLButtonElement | null>(null);
-  const panelRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    closeRef.current?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-
-      if (event.key !== 'Tab') return;
-
-      const focusable = panelRef.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      );
-
-      if (!focusable || !focusable.length) return;
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement;
-
-      if (event.shiftKey) {
-        if (active === first || !panelRef.current?.contains(active)) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (active === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  const FacetGroup = ({
-    title,
-    options,
-    activeValue,
-    onPick,
-  }: {
-    title: string;
-    options: FacetOption[];
-    activeValue: string | 'all';
-    onPick: (value: string) => void;
-  }) => (
-    <section className="filter-group">
-      <p className="filter-group__eyebrow">{title}</p>
-      <div className="filter-group__chips">
-        {options.map((option) => (
-          <ChipButton
-            key={option.value}
-            label={option.value === 'all' ? `Todas · ${option.count}` : `${option.label} · ${option.count}`}
-            active={activeValue === option.value}
-            onClick={() => onPick(option.value)}
-          />
-        ))}
-      </div>
-    </section>
-  );
+  const sheetClassName = compact
+    ? '!left-0 !right-0 !bottom-0 !top-0 !h-[100dvh] !w-[100vw] !max-w-none !rounded-none !border-0 !p-0 flex flex-col bg-[color:var(--bg)]'
+    : '!right-0 !top-0 !h-[100dvh] !w-[min(38rem,92vw)] !max-w-none !rounded-none !border-0 !border-l !p-0 flex flex-col bg-[color:var(--bg)]';
 
   return (
-    <div className={cx('filter-sheet', 'sheet', compact ? 'sheet--bottom' : 'sheet--drawer')} role="dialog" aria-modal="true" aria-label="Filtros avançados">
-      <button type="button" className="sheet__backdrop" aria-label="Fechar filtros" onClick={onClose} />
-      <div ref={panelRef} className={cx('sheet__panel', compact ? 'sheet__panel--bottom' : 'sheet__panel--drawer')}>
-        <div className="filter-sheet__body">
-          <header className="filter-sheet__header">
-            <div>
-              <p className="filter-sheet__eyebrow">Filtros</p>
-              <h2>Refinar o recorte</h2>
-              <p className="filter-sheet__description">Use chips para limitar as memórias por categoria, importância, tag, entidade, origem e período.</p>
+    <Sheet open={open} onOpenChange={(nextOpen: boolean) => {
+      if (!nextOpen) onClose();
+    }}>
+      <SheetContent side={compact ? 'bottom' : 'right'} showCloseButton={false} className={sheetClassName}>
+        <SheetHeader className="border-b border-border/70 bg-[color:var(--surface)]/92 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-[color:var(--surface)]/82 sm:px-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-2">
+              <SheetTitle className="font-serif text-[1.7rem] text-foreground">Refinar o recorte</SheetTitle>
+              <SheetDescription className="max-w-xl text-sm leading-6 text-muted-foreground">
+                Use os filtros para limar o índice sem transformar o diário em painel administrativo.
+              </SheetDescription>
             </div>
-            <div className="filter-sheet__actions">
-              <button type="button" className="ui-button" onClick={onClear}>
-                Limpar
-              </button>
-              <button ref={closeRef} type="button" className="ui-button ui-button--ghost" onClick={onClose}>
-                Fechar
-              </button>
-            </div>
-          </header>
+            <SheetClose asChild>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="Fechar filtros">
+                <XIcon />
+              </Button>
+            </SheetClose>
+          </div>
+        </SheetHeader>
 
-          <div className="filter-sheet__grid">
-            <FacetGroup title="Categorias" options={facetGroups.categories} activeValue={filters.category} onPick={(value) => onChange({ category: value as MemoryFilters['category'] })} />
-            <FacetGroup title="Importância" options={facetGroups.importance} activeValue={filters.importance} onPick={(value) => onChange({ importance: value as MemoryFilters['importance'] })} />
-            <FacetGroup title="Tags" options={facetGroups.tags} activeValue={filters.tag} onPick={(value) => onChange({ tag: value })} />
-            <FacetGroup title="Entidades" options={facetGroups.entities} activeValue={filters.entity} onPick={(value) => onChange({ entity: value })} />
-            <FacetGroup title="Origem" options={facetGroups.sources} activeValue={filters.source} onPick={(value) => onChange({ source: value })} />
-            <section className="filter-group">
-              <p className="filter-group__eyebrow">Período</p>
-              <div className="filter-group__chips">
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="space-y-6 px-4 py-5 sm:px-5">
+            <FilterGroup title="Categorias" options={facetGroups.categories} activeValue={filters.category} onPick={(value) => onChange({ category: value as MemoryFilters['category'] })} />
+            <Separator className="bg-border/60" />
+            <FilterGroup title="Importância" options={facetGroups.importance} activeValue={filters.importance} onPick={(value) => onChange({ importance: value as MemoryFilters['importance'] })} />
+            <Separator className="bg-border/60" />
+            <FilterGroup title="Marcas" options={facetGroups.tags} activeValue={filters.tag} onPick={(value) => onChange({ tag: value })} />
+            <Separator className="bg-border/60" />
+            <FilterGroup title="Entidades" options={facetGroups.entities} activeValue={filters.entity} onPick={(value) => onChange({ entity: value })} />
+            <Separator className="bg-border/60" />
+            <FilterGroup title="Origem" options={facetGroups.sources} activeValue={filters.source} onPick={(value) => onChange({ source: value })} />
+            <Separator className="bg-border/60" />
+            <section className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Período</p>
+                <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  {PERIOD_LABELS[filters.period]}
+                </Badge>
+              </div>
+              <div className="flex flex-wrap gap-2">
                 {(['all', '7d', '30d', '90d', '365d'] as const).map((value) => (
-                  <ChipButton
+                  <Button
                     key={value}
-                    label={value === 'all' ? `Tudo · ${filters.period === 'all' ? 'ativo' : ''}` : PERIOD_LABELS[value]}
-                    active={filters.period === value}
+                    type="button"
+                    variant={filters.period === value ? 'secondary' : 'outline'}
+                    size="sm"
+                    className="h-8 rounded-full px-3 text-xs shadow-sm"
                     onClick={() => onChange({ period: value })}
-                  />
+                  >
+                    {value === 'all' ? `Tudo · ${facetGroups.categories[0]?.count ?? 0}` : PERIOD_LABELS[value]}
+                  </Button>
                 ))}
               </div>
             </section>
           </div>
-        </div>
-      </div>
-    </div>
+        </ScrollArea>
+
+        <SheetFooter className="border-t border-border/70 bg-[color:var(--surface)]/96 px-4 py-3 sm:px-5">
+          <div className="flex w-full gap-2">
+            <Button type="button" variant="outline" className="flex-1 rounded-full" onClick={onClear}>
+              Limpar
+            </Button>
+            <SheetClose asChild>
+              <Button type="button" className="flex-1 rounded-full">
+                Fechar
+              </Button>
+            </SheetClose>
+          </div>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -749,7 +948,7 @@ export interface AppShellProps {
   surface: AppSurface;
   onSurfaceChange: (surface: AppSurface) => void;
   syncLabel: string;
-  syncTone: PillTone;
+  syncTone: 'neutral' | 'good' | 'warning' | 'danger' | 'accent';
   totalCount: number;
   visibleCount: number;
   activeFilterSummary: string[];
@@ -809,9 +1008,6 @@ function DiaryLayout({
   filtersOpen,
   onTimelineScroll,
 }: AppShellProps) {
-  const indexVisible = true;
-  const readingVisible = !compact || mobileView === 'reading';
-  const resultLabelText = `Fragmentos · ${visibleCount} de ${totalCount}`;
   const timelineEntries = useMemo(() => timelineGroups.flatMap((group) => group.entries), [timelineGroups]);
   const selectedIndex = useMemo(
     () => (selectedRecord ? timelineEntries.findIndex((entry) => entry.memoryId === selectedRecord.id) : -1),
@@ -826,42 +1022,41 @@ function DiaryLayout({
   const goNext = () => {
     if (nextEntry) onSelectRecord(nextEntry.memoryId);
   };
+  const resultLabelText = `Fragmentos · ${visibleCount} de ${totalCount}`;
+  const indexHidden = compact && mobileView === 'reading';
 
   return (
-    <div className={cx('notebook-layout', compact && 'notebook-layout--compact')}>
-      {indexVisible ? (
-        <DiaryIndex
-          query={filters.query}
-          onQueryChange={onQueryChange}
-          onOpenFilters={onOpenFilters}
-          activeFilterCount={activeFilterCount}
-          activeFilterSummary={activeFilterSummary}
-          resultLabelText={resultLabelText}
-          surface={surface}
-          onSurfaceChange={onSurfaceChange}
-          syncLabel={syncLabel}
-          syncTone={syncTone}
-          compact={compact}
-          className={compact && mobileView === 'reading' ? 'index-pane--underlay' : undefined}
-          ariaHidden={compact && mobileView === 'reading'}
-          timelineGroups={timelineGroups}
-          selectedId={selectedRecord?.id ?? null}
-          onSelectRecord={onSelectRecord}
-          onPickTag={(value) => onToggleFilter('tag', value)}
-          scrollRef={indexScrollRef}
-          onScroll={onTimelineScroll}
-          onCaptureTimelineAnchor={onRememberTimelinePosition}
-          restoreAnchor={mobileTimelineRestoreAnchor}
-          restoreFocusRef={restoreFocusRef}
-          onRestoreComplete={onTimelineRestoreComplete}
-        />
-      ) : null}
+    <div className={cn('flex min-h-dvh flex-col bg-[color:var(--bg)] text-foreground md:grid md:grid-cols-[clamp(22rem,28vw,27.5rem)_minmax(0,1fr)]', compact && 'md:grid-cols-1')}>
+      <DiaryIndex
+        query={filters.query}
+        onQueryChange={onQueryChange}
+        onOpenFilters={onOpenFilters}
+        activeFilterCount={activeFilterCount}
+        activeFilterSummary={activeFilterSummary}
+        resultLabelText={resultLabelText}
+        surface={surface}
+        onSurfaceChange={onSurfaceChange}
+        syncLabel={syncLabel}
+        compact={compact}
+        timelineGroups={timelineGroups}
+        selectedId={selectedRecord?.id ?? null}
+        onSelectRecord={onSelectRecord}
+        onPickTag={(value) => onToggleFilter('tag', value)}
+        scrollRef={indexScrollRef}
+        onScroll={onTimelineScroll}
+        onCaptureTimelineAnchor={onRememberTimelinePosition}
+        restoreAnchor={mobileTimelineRestoreAnchor}
+        restoreFocusRef={restoreFocusRef}
+        onRestoreComplete={onTimelineRestoreComplete}
+        className={cn(indexHidden && 'pointer-events-none select-none')}
+        ariaHidden={indexHidden}
+      />
 
-      {readingVisible ? (
-        <ReadingPage
+      {!compact ? (
+        <ReadingPane
           record={selectedRecord}
           related={relatedRecords}
-          mobile={compact}
+          mobile={false}
           onBack={onBackToIndex}
           onSelectRecord={onSelectRecord}
           pageLabel={pageLabel}
@@ -871,6 +1066,19 @@ function DiaryLayout({
           onNext={goNext}
         />
       ) : null}
+
+      <MobileReadingSheet
+        open={compact && mobileView === 'reading'}
+        record={selectedRecord}
+        related={relatedRecords}
+        pageLabel={pageLabel}
+        hasPrevious={Boolean(previousEntry)}
+        hasNext={Boolean(nextEntry)}
+        onBack={onBackToIndex}
+        onSelectRecord={onSelectRecord}
+        onPrevious={goPrevious}
+        onNext={goNext}
+      />
 
       <FilterSheet
         open={filtersOpen}
@@ -886,9 +1094,5 @@ function DiaryLayout({
 }
 
 export function AppShell(props: AppShellProps) {
-  return (
-    <div className={cx('notebook-shell', props.compact && 'notebook-shell--compact')}>
-      <DiaryLayout {...props} />
-    </div>
-  );
+  return <DiaryLayout {...props} />;
 }
