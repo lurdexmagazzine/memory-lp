@@ -11,7 +11,7 @@ import {
   formatTimeLabel,
   paragraphs,
 } from '../lib/memory';
-import { presentLabel, presentShortTitle, presentTitle } from '../lib/presentation';
+import { presentExcerpt, presentLabel, presentShortTitle, presentSummary, presentTitle } from '../lib/presentation';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -186,24 +186,24 @@ function FragmentItem({
         />
         <article
           className={cn(
-            'ml-3 rounded-[1.45rem] border border-border/70 bg-[color:var(--surface)]/96 px-4 py-4 shadow-sm transition-all',
-            active ? 'ring-1 ring-[color:var(--line-strong)] shadow-[0_12px_28px_rgba(28,24,18,0.08)]' : 'hover:bg-[color:var(--surface-strong)]/85 hover:shadow-md',
+            'ml-3 border-l border-[color:var(--mauve-soft)] bg-transparent px-4 py-3 shadow-none transition-all',
+            active ? 'rounded-[1.35rem] border border-border/60 bg-[color:var(--surface)]/94 px-4 py-4 shadow-[0_10px_24px_rgba(28,24,18,0.08)]' : 'hover:bg-[color:var(--surface-strong)]/70',
           )}
         >
-          <div className="flex items-center justify-between gap-2 text-[0.68rem] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-[0.76rem] text-muted-foreground">
             <span>{formatShortDateLabel(entry.createdAtMs)}</span>
             <span aria-hidden="true">·</span>
             <span>{sourceLabel(entry.source)}</span>
           </div>
-          <h3 className="mt-2 font-serif text-[1.02rem] leading-[1.15] text-foreground [overflow-wrap:anywhere]" title={entry.title}>
+          <h3 className="mt-2 font-serif text-[1rem] leading-[1.12] text-foreground [overflow-wrap:anywhere]" title={entry.title}>
             {displayTitle}
           </h3>
-          <p className="mt-2 line-clamp-2 text-[0.94rem] leading-6 text-foreground/84">{entry.excerpt}</p>
+          <p className="mt-2 line-clamp-2 text-[0.92rem] leading-6 text-foreground/82">{presentExcerpt(entry.excerpt, 110)}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="rounded-full px-2.5 py-0.5 text-[10px] uppercase tracking-[0.12em]">
+            <Badge variant="secondary" className="rounded-full px-2.5 py-0.5 text-[10px] tracking-[0.04em]">
               {CATEGORY_LABELS[entry.category]}
             </Badge>
-            <Badge variant="outline" className="rounded-full px-2.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+            <Badge variant="outline" className="rounded-full px-2.5 py-0.5 text-[10px] tracking-[0.04em] text-muted-foreground">
               {IMPORTANCE_LABELS[entry.importance]}
             </Badge>
             {tags.visible.map((tag) => (
@@ -250,35 +250,26 @@ function FragmentItem({
         aria-hidden="true"
         className="absolute left-0 top-5 bottom-5 w-1 rounded-r-full bg-[color:var(--mauve)] opacity-0 transition-opacity group-data-[active=true]:opacity-100"
       />
-      <Card
-        size="sm"
+      <article
         className={cn(
-          '!gap-0 !py-0 overflow-hidden border-border/70 bg-[color:var(--surface)]/96 transition-all',
-          active
-            ? 'ring-1 ring-[color:var(--line-strong)] shadow-[0_12px_28px_rgba(28,24,18,0.08)]'
-            : 'shadow-sm hover:bg-[color:var(--surface-strong)]/85 hover:shadow-md',
+          'ml-3 rounded-[1.35rem] border border-border/70 bg-[color:var(--surface)]/96 px-4 py-4 shadow-sm transition-all',
+          active ? 'ring-1 ring-[color:var(--line-strong)] shadow-[0_12px_28px_rgba(28,24,18,0.08)]' : 'hover:bg-[color:var(--surface-strong)]/85 hover:shadow-md',
         )}
       >
-        <CardHeader className="gap-2 px-4 pt-4 pb-2 md:px-5">
-          <div className="flex flex-wrap items-center gap-2 text-[0.72rem] uppercase tracking-[0.22em] text-muted-foreground">
-            <span>{formatShortDateLabel(entry.createdAtMs)}</span>
-            <span aria-hidden="true">·</span>
-            <span>{sourceLabel(entry.source)}</span>
-          </div>
-          <div className="flex items-start justify-between gap-3">
-            <h3 className="min-w-0 font-serif text-[1.05rem] leading-snug text-foreground md:text-[1.08rem]">{displayTitle}</h3>
-            <Badge variant="outline" className="rounded-full px-2.5 py-0.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-              {IMPORTANCE_LABELS[entry.importance]}
-            </Badge>
-          </div>
-        </CardHeader>
-
-        <CardContent className="px-4 pb-3 md:px-5">
-          <p className="line-clamp-2 text-sm leading-6 text-foreground/84">{entry.excerpt}</p>
-        </CardContent>
-
-        <CardFooter className="flex flex-wrap items-center gap-2 border-t border-border/60 bg-transparent px-4 py-3 md:px-5">
-          <Badge variant="secondary" className="rounded-full px-2.5 py-0.5 text-[11px] uppercase tracking-[0.14em]">
+        <div className="flex flex-wrap items-center gap-2 text-[0.72rem] text-muted-foreground">
+          <span>{formatShortDateLabel(entry.createdAtMs)}</span>
+          <span aria-hidden="true">·</span>
+          <span>{sourceLabel(entry.source)}</span>
+        </div>
+        <div className="mt-2 flex items-start justify-between gap-3">
+          <h3 className="min-w-0 font-serif text-[1.03rem] leading-[1.12] text-foreground md:text-[1.06rem] [overflow-wrap:anywhere]" title={displayTitle}>{displayTitle}</h3>
+          <Badge variant="outline" className="rounded-full px-2.5 py-0.5 text-[11px] tracking-[0.04em] text-muted-foreground">
+            {IMPORTANCE_LABELS[entry.importance]}
+          </Badge>
+        </div>
+        <p className="mt-2 line-clamp-2 text-[0.92rem] leading-6 text-foreground/84">{presentExcerpt(entry.excerpt, 110)}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Badge variant="secondary" className="rounded-full px-2.5 py-0.5 text-[11px] tracking-[0.04em]">
             {CATEGORY_LABELS[entry.category]}
           </Badge>
           {tags.visible.map((tag) => (
@@ -304,14 +295,14 @@ function FragmentItem({
               <Badge
                 key={`${entry.memoryId}-entity-${entity}`}
                 variant="ghost"
-                className="rounded-full px-2.5 py-0.5 text-[11px] uppercase tracking-[0.12em] text-muted-foreground"
+                className="rounded-full px-2.5 py-0.5 text-[11px] tracking-[0.04em] text-muted-foreground"
               >
                 {entity}
               </Badge>
             ))}
           </div>
-        </CardFooter>
-      </Card>
+        </div>
+      </article>
     </button>
   );
 }
@@ -624,20 +615,20 @@ function ReadingDocument({
         <div className="space-y-5 px-4 py-4 sm:px-5">
           <header className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.12em]">
+              <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em]">
                 {pageLabel}
               </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
                 {CATEGORY_LABELS[record.category]}
               </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
                 {sourceLabel(record.source)}
               </Badge>
             </div>
           </header>
 
           <section className="reading-section space-y-3">
-            <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Anotação</p>
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Anotação</p>
             <div className="space-y-4 text-[0.96rem] leading-7 text-foreground/88">
               {paragraphs(record.content).map((paragraph, index) => (
                 <p key={`${record.id}-paragraph-${index}`}>{paragraph}</p>
@@ -648,30 +639,30 @@ function ReadingDocument({
           <Separator className="bg-border/70" />
 
           <section className="reading-section space-y-3">
-            <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Marcas</p>
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Marcas</p>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.12em]">
+              <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em]">
                 Data · {formatDateLabel(record.createdAtMs)}
               </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
                 {formatTimeLabel(record.createdAtMs)}
               </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
                 Origem · {sourceLabel(record.source)}
               </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
                 Categoria · {CATEGORY_LABELS[record.category]}
               </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
                 Importância · {IMPORTANCE_LABELS[record.importance]}
               </Badge>
               {record.tags.slice(0, 2).map((tag) => (
-                <Badge key={`${record.id}-tag-${tag}`} variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.12em]">
+                <Badge key={`${record.id}-tag-${tag}`} variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em]">
                   {tag}
                 </Badge>
               ))}
               {record.tags.length > 2 ? (
-                <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
                   +{record.tags.length - 2}
                 </Badge>
               ) : null}
@@ -681,7 +672,7 @@ function ReadingDocument({
           <Separator className="bg-border/70" />
 
           <section className="reading-section space-y-3">
-            <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Ecos relacionados</p>
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Ecos relacionados</p>
             {visibleRelated.length ? (
               <div className="grid gap-3">
                 {visibleRelated.map(({ record: relatedRecord, relation }) => (
@@ -716,7 +707,7 @@ function ReadingDocument({
           </Badge>
         </div>
         <p className="text-sm leading-6 text-muted-foreground">Leitura íntima, sem ruído de dashboard ou lista corporativa.</p>
-        {showSummary ? <p className="text-sm leading-6 text-foreground/80">{record.summary}</p> : null}
+        {showSummary ? <p className="text-sm leading-6 text-foreground/80">{presentSummary(record.summary, 140)}</p> : null}
       </CardHeader>
 
       <CardContent className="space-y-6 px-5 py-5 md:px-6">
@@ -946,11 +937,11 @@ function MobileReadingOverlay({
                   {pageLabel}
                 </Badge>
               </div>
-              <h2 className="max-w-full font-serif text-[clamp(1.45rem,6vw,2rem)] leading-[1.1] text-foreground [overflow-wrap:anywhere]" title={record?.title ?? undefined}>
+              <h2 className="font-serif text-[clamp(1.38rem,6vw,1.95rem)] leading-[1.08] text-foreground [overflow-wrap:anywhere]" title={record?.title ?? undefined}>
                 {record ? presentShortTitle(record.title) : 'Selecione uma memória'}
               </h2>
               {record && shouldShowReadingSummary(record) ? (
-                <p className="max-w-4xl text-sm leading-7 text-muted-foreground">{record.summary}</p>
+                <p className="max-w-4xl text-sm leading-7 text-muted-foreground">{presentSummary(record.summary, 120)}</p>
               ) : (
                 <p className="max-w-4xl text-sm leading-7 text-muted-foreground">A leitura abre aqui como uma página de diário.</p>
               )}
