@@ -132,8 +132,10 @@ function buildFilterSummary(filters: MemoryFilters): string[] {
   return labels;
 }
 
+type MobileView = 'index' | 'reading';
+
 function App() {
-  const desktop = useMediaQuery('(min-width: 1200px)');
+  const mobile = useMediaQuery('(max-width: 767.98px)');
   const [dataset, setDataset] = useState<MemoryDataset | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
@@ -141,9 +143,9 @@ function App() {
   const [surface, setSurface] = useState<AppSurface>('diary');
   const [filters, setFilters] = useState<MemoryFilters>(DEFAULT_FILTERS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [readerId, setReaderId] = useState<string | null>(null);
+  const [mobileView, setMobileView] = useState<MobileView>('index');
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const scrollAnchorRef = useRef(0);
+  const scrollAnchorRef = useRef<number>(0);
 
   useEffect(() => {
     let active = true;
@@ -199,34 +201,36 @@ function App() {
   }, [selectedId, visibleRecords]);
 
   const relatedRecords = useMemo(() => {
-    if (!readerId) return [] as Array<{ record: MemoryEntry; relation: MemoryRelation }>;
-    return getRelatedRecords(readerId, visibleRelations, visibleRecords, 6);
-  }, [readerId, visibleRelations, visibleRecords]);
+    if (!selectedRecord) return [] as Array<{ record: MemoryEntry; relation: MemoryRelation }>;
+    return getRelatedRecords(selectedRecord.id, visibleRelations, visibleRecords, 6);
+  }, [selectedRecord, visibleRelations, visibleRecords]);
 
   useEffect(() => {
     if (!visibleRecords.length) {
       setSelectedId(null);
-      setReaderId(null);
+      if (mobile) {
+        setMobileView('index');
+      }
       return;
     }
 
-    if (!selectedId || !visibleRecords.some((record) => record.id === selectedId)) {
+    const selectedStillVisible = selectedId ? visibleRecords.some((record) => record.id === selectedId) : false;
+    if (!selectedStillVisible) {
       const fallback = selectFallbackRecord(visibleRecords) ?? visibleRecords[0] ?? null;
       setSelectedId(fallback?.id ?? null);
     }
 
-    if (readerId && !visibleRecords.some((record) => record.id === readerId)) {
-      setReaderId(null);
+    if (mobile && mobileView === 'reading' && !selectedStillVisible) {
+      setMobileView('index');
     }
-  }, [visibleRecords, selectedId, readerId]);
+  }, [visibleRecords, selectedId, mobile, mobileView]);
 
   useEffect(() => {
-    if (readerId === null) {
-      return;
+    if (!mobile && mobileView === 'index') return;
+    if (mobileView === 'reading') {
+      window.scrollTo(0, 0);
     }
-
-    window.scrollTo(0, 0);
-  }, [readerId]);
+  }, [mobile, mobileView]);
 
   const totalCount = dataset?.records.length ?? 0;
   const visibleCount = visibleRecords.length;
@@ -270,17 +274,20 @@ function App() {
   };
 
   const openRecord = (id: string) => {
-    const wasReading = readerId !== null;
+    const wasMobileReading = mobile && mobileView === 'reading';
     setSelectedId(id);
-    if (!wasReading) {
-      scrollAnchorRef.current = window.scrollY;
+
+    if (mobile) {
+      if (!wasMobileReading) {
+        scrollAnchorRef.current = window.scrollY;
+      }
+      setMobileView('reading');
+      window.scrollTo(0, 0);
     }
-    setReaderId(id);
-    window.scrollTo(0, 0);
   };
 
-  const backToTimeline = () => {
-    setReaderId(null);
+  const backToIndex = () => {
+    setMobileView('index');
     window.requestAnimationFrame(() => {
       window.scrollTo(0, scrollAnchorRef.current);
     });
@@ -288,6 +295,13 @@ function App() {
 
   const openFilters = () => setFiltersOpen(true);
   const closeFilters = () => setFiltersOpen(false);
+
+  const handleSurfaceChange = (nextSurface: AppSurface) => {
+    setSurface(nextSurface);
+    if (mobile) {
+      setMobileView('index');
+    }
+  };
 
   if (status === 'loading') {
     return <LoadingState />;
@@ -305,12 +319,9 @@ function App() {
 
   return (
     <AppShell
-      compact={!desktop}
+      compact={mobile}
       surface={surface}
-      onSurfaceChange={(nextSurface) => {
-        setSurface(nextSurface);
-        setReaderId(null);
-      }}
+      onSurfaceChange={handleSurfaceChange}
       syncLabel={syncLabel}
       syncTone={syncTone}
       totalCount={totalCount}
@@ -322,10 +333,10 @@ function App() {
       timelineGroups={timelineGroups}
       selectedRecord={selectedRecord}
       relatedRecords={relatedRecords}
-      readerOpen={readerId !== null}
+      mobileView={mobileView}
       filtersOpen={filtersOpen}
       onSelectRecord={openRecord}
-      onBackToTimeline={backToTimeline}
+      onBackToIndex={backToIndex}
       onQueryChange={(value) => patchFilters({ query: value })}
       onToggleFilter={toggleFilter}
       onPatchFilters={patchFilters}

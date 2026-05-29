@@ -63,7 +63,7 @@ export function LoadingState({ label = 'Abrindo o acervo…' }: { label?: string
     <section className="empty-state empty-state--loading" aria-busy="true" aria-live="polite">
       <p className="empty-state__eyebrow">Carregando</p>
       <h3 className="empty-state__title">{label}</h3>
-      <p className="empty-state__description">Lendo o snapshot, normalizando os dados e montando lista, timeline e reader.</p>
+      <p className="empty-state__description">Lendo o snapshot, normalizando os dados e montando o índice, a timeline e a leitura.</p>
     </section>
   );
 }

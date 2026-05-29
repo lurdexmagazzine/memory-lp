@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { AppSurface, DiaryGroup, FacetOption, MemoryEntry, MemoryFilters, MemoryRelation } from '../types';
 import type { FacetGroups } from '../lib/memory';
 import {
@@ -31,6 +31,13 @@ function relationLabel(kind: MemoryRelation['kind']): string {
 
 function sourceLabel(source: string): string {
   return source === 'holographic' ? 'Holographic' : source;
+}
+
+function compactTags(tags: string[], maxVisible = 2): { visible: string[]; hidden: number } {
+  return {
+    visible: tags.slice(0, maxVisible),
+    hidden: Math.max(0, tags.length - maxVisible),
+  };
 }
 
 function resultLabel(visibleCount: number): string {
@@ -66,18 +73,7 @@ function SurfaceTabs({
   );
 }
 
-function TopNavigation({ syncLabel, syncTone }: { syncLabel: string; syncTone: PillTone }) {
-  return (
-    <header className="top-navigation">
-      <div className="top-navigation__brand">
-        <h1>Memory</h1>
-      </div>
-      <StatusPill label={syncLabel} tone={syncTone} />
-    </header>
-  );
-}
-
-function JournalToolbar({
+function IndexToolbar({
   query,
   onQueryChange,
   onOpenFilters,
@@ -86,6 +82,8 @@ function JournalToolbar({
   resultLabelText,
   surface,
   onSurfaceChange,
+  syncLabel,
+  syncTone,
   compact,
 }: {
   query: string;
@@ -96,14 +94,24 @@ function JournalToolbar({
   resultLabelText: string;
   surface: AppSurface;
   onSurfaceChange: (surface: AppSurface) => void;
+  syncLabel: string;
+  syncTone: PillTone;
   compact: boolean;
 }) {
   return (
-    <section className={cx('journal-toolbar', compact && 'journal-toolbar--compact')} aria-label="Busca, filtros e modos">
-      <div className="journal-toolbar__row">
-        <SurfaceTabs surface={surface} onSurfaceChange={onSurfaceChange} />
+    <header className={cx('index-toolbar', compact && 'index-toolbar--compact')}>
+      <div className="index-toolbar__top">
+        <div className="index-toolbar__brand">
+          <h1>Memory</h1>
+          <StatusPill label={syncLabel} tone={syncTone} />
+        </div>
+        <p className="index-toolbar__count">{resultLabelText}</p>
+      </div>
 
-        <label className="journal-search" htmlFor="memory-search">
+      <SurfaceTabs surface={surface} onSurfaceChange={onSurfaceChange} />
+
+      <div className="index-toolbar__controls">
+        <label className="search-field" htmlFor="memory-search">
           <span>Buscar</span>
           <input
             id="memory-search"
@@ -115,58 +123,55 @@ function JournalToolbar({
           />
         </label>
 
-        <button type="button" className="ui-button ui-button--ghost journal-toolbar__filters" onClick={onOpenFilters}>
+        <button type="button" className="ui-button ui-button--ghost index-toolbar__filters" onClick={onOpenFilters}>
           Filtros{activeFilterCount ? ` · ${activeFilterCount}` : ''}
         </button>
       </div>
 
-      <div className="journal-toolbar__meta">
-        <StatusPill label={resultLabelText} tone={activeFilterCount ? 'accent' : 'neutral'} />
-        <p className="journal-toolbar__summary">
-          {activeFilterSummary.length ? activeFilterSummary.join(' · ') : 'Leitura limpa, busca forte e filtros compactos.'}
+      <div className="index-toolbar__meta">
+        <p className="index-toolbar__summary">
+          {activeFilterSummary.length ? activeFilterSummary.join(' · ') : 'Timeline em ordem editorial.'}
         </p>
       </div>
-    </section>
+    </header>
   );
 }
 
-function MemoryEntryRow({
+function MemoryListItem({
   record,
   active,
   onSelect,
   onPickTag,
-  onPickEntity,
 }: {
   record: MemoryEntry;
   active: boolean;
   onSelect: () => void;
   onPickTag: (value: string) => void;
-  onPickEntity: (value: string) => void;
 }) {
+  const tags = compactTags(record.tags, 2);
+
   return (
-    <article className={cx('memory-row', active && 'is-active')}>
-      <button type="button" className="memory-row__body" onClick={onSelect}>
-        <div className="memory-row__top">
-          <span className="memory-row__date">{formatShortDateLabel(record.createdAtMs)}</span>
-          <span className="memory-row__category">{CATEGORY_LABELS[record.category]}</span>
+    <article className={cx('memory-list-item', active && 'is-active')}>
+      <button type="button" className="memory-list-item__body" onClick={onSelect}>
+        <div className="memory-list-item__top">
+          <span className="memory-list-item__date">{formatShortDateLabel(record.createdAtMs)}</span>
+          <span className="memory-list-item__source">{sourceLabel(record.source)}</span>
         </div>
 
-        <h3 className="memory-row__title">{record.title}</h3>
-        <p className="memory-row__excerpt">{record.summary}</p>
+        <h3 className="memory-list-item__title">{record.title}</h3>
+        <p className="memory-list-item__excerpt">{record.summary}</p>
 
-        <div className="memory-row__meta">
-          <span>{sourceLabel(record.source)}</span>
+        <div className="memory-list-item__meta">
+          <span>{CATEGORY_LABELS[record.category]}</span>
           <span>{IMPORTANCE_LABELS[record.importance]}</span>
         </div>
       </button>
 
-      <div className="memory-row__chips">
-        {record.tags.slice(0, 2).map((tag) => (
+      <div className="memory-list-item__chips" aria-label="Tags da memória">
+        {tags.visible.map((tag) => (
           <ChipButton key={`${record.id}-tag-${tag}`} label={tag} active={false} onClick={() => onPickTag(tag)} />
         ))}
-        {record.entities.slice(0, 2).map((entity) => (
-          <ChipButton key={`${record.id}-entity-${entity}`} label={entity} active={false} onClick={() => onPickEntity(entity)} />
-        ))}
+        {tags.hidden > 0 ? <span className="memory-list-item__more">+{tags.hidden}</span> : null}
       </div>
     </article>
   );
@@ -177,13 +182,11 @@ function DayGroup({
   selectedId,
   onSelectRecord,
   onPickTag,
-  onPickEntity,
 }: {
   group: DiaryGroup;
   selectedId: string | null;
   onSelectRecord: (id: string) => void;
   onPickTag: (value: string) => void;
-  onPickEntity: (value: string) => void;
 }) {
   const totalEntries = group.entries.length;
 
@@ -198,7 +201,7 @@ function DayGroup({
 
       <div className="day-group__list">
         {group.entries.map((entry) => (
-          <MemoryEntryRow
+          <MemoryListItem
             key={entry.id}
             record={{
               id: entry.memoryId,
@@ -225,7 +228,6 @@ function DayGroup({
             active={entry.memoryId === selectedId}
             onSelect={() => onSelectRecord(entry.memoryId)}
             onPickTag={onPickTag}
-            onPickEntity={onPickEntity}
           />
         ))}
       </div>
@@ -233,46 +235,106 @@ function DayGroup({
   );
 }
 
-function JournalTimeline({
-  groups,
+function MemoryIndex({
+  query,
+  onQueryChange,
+  onOpenFilters,
+  activeFilterCount,
+  activeFilterSummary,
+  resultLabelText,
+  surface,
+  onSurfaceChange,
+  syncLabel,
+  syncTone,
+  compact,
+  timelineGroups,
   selectedId,
   onSelectRecord,
   onPickTag,
-  onPickEntity,
 }: {
-  groups: DiaryGroup[];
+  query: string;
+  onQueryChange: (value: string) => void;
+  onOpenFilters: () => void;
+  activeFilterCount: number;
+  activeFilterSummary: string[];
+  resultLabelText: string;
+  surface: AppSurface;
+  onSurfaceChange: (surface: AppSurface) => void;
+  syncLabel: string;
+  syncTone: PillTone;
+  compact: boolean;
+  timelineGroups: DiaryGroup[];
   selectedId: string | null;
   onSelectRecord: (id: string) => void;
   onPickTag: (value: string) => void;
-  onPickEntity: (value: string) => void;
 }) {
-  if (!groups.length) {
-    return (
-      <EmptyState
-        eyebrow="Diário"
-        title="Nenhuma entrada no recorte atual"
-        description="A timeline aparece quando a busca ou os filtros encontram registros datados."
-      />
-    );
-  }
-
   return (
-    <section className="timeline-stack" aria-label="Timeline do diário e das memórias">
-      {groups.map((group) => (
-        <DayGroup
-          key={group.key}
-          group={group}
-          selectedId={selectedId}
-          onSelectRecord={onSelectRecord}
-          onPickTag={onPickTag}
-          onPickEntity={onPickEntity}
-        />
-      ))}
+    <section className={cx('index-pane', compact && 'index-pane--compact')} aria-label="Índice de memórias">
+      <IndexToolbar
+        query={query}
+        onQueryChange={onQueryChange}
+        onOpenFilters={onOpenFilters}
+        activeFilterCount={activeFilterCount}
+        activeFilterSummary={activeFilterSummary}
+        resultLabelText={resultLabelText}
+        surface={surface}
+        onSurfaceChange={onSurfaceChange}
+        syncLabel={syncLabel}
+        syncTone={syncTone}
+        compact={compact}
+      />
+
+      <div className="index-pane__scroll">
+        {timelineGroups.length ? (
+          <section className="timeline-stack" aria-label="Timeline do diário e das memórias">
+            {timelineGroups.map((group) => (
+              <DayGroup
+                key={group.key}
+                group={group}
+                selectedId={selectedId}
+                onSelectRecord={onSelectRecord}
+                onPickTag={onPickTag}
+              />
+            ))}
+          </section>
+        ) : (
+          <EmptyState
+            eyebrow="Índice"
+            title="Nenhuma entrada no recorte atual"
+            description="A timeline aparece quando a busca ou os filtros encontram memórias datadas."
+          />
+        )}
+      </div>
     </section>
   );
 }
 
-function RelatedEntries({
+function ReadingMetadata({ record }: { record: MemoryEntry }) {
+  return (
+    <section className="reading-metadata" aria-label="Metadados da memória">
+      <div>
+        <span>Data</span>
+        <strong>
+          {formatDateLabel(record.createdAtMs)} · {formatTimeLabel(record.createdAtMs)}
+        </strong>
+      </div>
+      <div>
+        <span>Categoria</span>
+        <strong>{CATEGORY_LABELS[record.category]}</strong>
+      </div>
+      <div>
+        <span>Origem</span>
+        <strong>{sourceLabel(record.source)}</strong>
+      </div>
+      <div>
+        <span>Importância</span>
+        <strong>{IMPORTANCE_LABELS[record.importance]}</strong>
+      </div>
+    </section>
+  );
+}
+
+function RelatedMemories({
   items,
   onSelect,
 }: {
@@ -284,7 +346,7 @@ function RelatedEntries({
       <EmptyState
         eyebrow="Relacionadas"
         title="Sem relações fortes"
-        description="As relações aparecem aqui como apoio à leitura, não como tela principal."
+        description="Quando houver relações confiáveis, elas aparecem aqui como apoio à leitura."
       />
     );
   }
@@ -308,94 +370,79 @@ function RelatedEntries({
   );
 }
 
-function ReadingView({
+function ReadingPane({
   record,
   related,
+  mobile,
   onBack,
   onSelectRecord,
 }: {
   record: MemoryEntry | null;
   related: Array<{ record: MemoryEntry; relation: MemoryRelation }>;
+  mobile: boolean;
   onBack: () => void;
   onSelectRecord: (id: string) => void;
 }) {
   if (!record) {
     return (
-      <EmptyState
-        eyebrow="Leitura"
-        title="Selecione uma entrada"
-        description="A leitura completa aparece aqui, em formato de página única, com conteúdo, metadados e relações no fim."
-        action={
-          <button type="button" className="ui-button" onClick={onBack}>
-            Voltar
-          </button>
-        }
-      />
+      <section className="reading-pane" aria-label="Leitura da memória">
+        <div className="reading-pane__scroll">
+          <EmptyState
+            eyebrow="Leitura"
+            title="Selecione uma memória"
+            description="A entrada abre aqui como uma página de diário com data, conteúdo e relações ao fim."
+            action={mobile ? <button type="button" className="ui-button" onClick={onBack}>Voltar</button> : undefined}
+          />
+        </div>
+      </section>
     );
   }
 
   return (
-    <article className="reading-view" aria-label={`Leitura de ${record.title}`}>
-      <div className="reading-view__bar">
-        <button type="button" className="ui-button ui-button--ghost" onClick={onBack}>
-          Voltar
-        </button>
-        <StatusPill label={CATEGORY_LABELS[record.category]} tone="accent" />
+    <section className="reading-pane" aria-label={`Leitura de ${record.title}`}>
+      <div className="reading-pane__scroll">
+        {mobile ? (
+          <div className="reading-pane__mobile-bar">
+            <button type="button" className="ui-button ui-button--ghost" onClick={onBack}>
+              Voltar
+            </button>
+            <StatusPill label={CATEGORY_LABELS[record.category]} tone="accent" />
+          </div>
+        ) : null}
+
+        <header className="reading-header">
+          <p className="reading-header__eyebrow">Leitura</p>
+          <h2>{record.title}</h2>
+          <p className="reading-header__summary">{record.summary}</p>
+        </header>
+
+        <ReadingMetadata record={record} />
+
+        <section className="reading-section">
+          <p className="reading-section__eyebrow">Conteúdo</p>
+          <div className="reading-content">
+            {paragraphs(record.content).map((paragraph, index) => (
+              <p key={`${record.id}-${index}`}>{paragraph}</p>
+            ))}
+          </div>
+        </section>
+
+        <section className="reading-section">
+          <p className="reading-section__eyebrow">Tags e entidades</p>
+          <div className="reading-chip-row">
+            {record.tags.length ? record.tags.map((tag) => <StatusPill key={`${record.id}-tag-${tag}`} label={tag} tone="accent" />) : <StatusPill label="Sem tags" tone="neutral" />}
+            {record.entities.length ? record.entities.map((entity) => <StatusPill key={`${record.id}-entity-${entity}`} label={entity} tone="neutral" />) : <StatusPill label="Sem entidades" tone="neutral" />}
+          </div>
+        </section>
+
+        <RelatedMemories items={related} onSelect={onSelectRecord} />
+
+        <section className="reading-section">
+          <p className="reading-section__eyebrow">Resumo de leitura</p>
+          <p className="reading-footnote">{recordToInspectorSummary(record)}</p>
+        </section>
       </div>
-
-      <header className="reading-view__header">
-        <p className="reading-view__eyebrow">Leitura</p>
-        <h2>{record.title}</h2>
-        <p className="reading-view__summary">{record.summary}</p>
-      </header>
-
-      <section className="reading-section">
-        <div className="reading-meta-grid">
-          <div>
-            <span>Data</span>
-            <strong>
-              {formatDateLabel(record.createdAtMs)} · {formatTimeLabel(record.createdAtMs)}
-            </strong>
-          </div>
-          <div>
-            <span>Origem</span>
-            <strong>{sourceLabel(record.source)}</strong>
-          </div>
-          <div>
-            <span>Importância</span>
-            <strong>{IMPORTANCE_LABELS[record.importance]}</strong>
-          </div>
-          <div>
-            <span>Relações</span>
-            <strong>{record.relationCount}</strong>
-          </div>
-        </div>
-      </section>
-
-      <section className="reading-section">
-        <p className="reading-section__eyebrow">Conteúdo</p>
-        <div className="reading-content">
-          {paragraphs(record.content).map((paragraph, index) => (
-            <p key={`${record.id}-${index}`}>{paragraph}</p>
-          ))}
-        </div>
-      </section>
-
-      <section className="reading-section">
-        <p className="reading-section__eyebrow">Tags e entidades</p>
-        <div className="reading-chip-row">
-          {record.tags.length ? record.tags.map((tag) => <StatusPill key={`${record.id}-tag-${tag}`} label={tag} tone="accent" />) : <StatusPill label="Sem tags" tone="neutral" />}
-          {record.entities.length ? record.entities.map((entity) => <StatusPill key={`${record.id}-entity-${entity}`} label={entity} tone="neutral" />) : <StatusPill label="Sem entidades" tone="neutral" />}
-        </div>
-      </section>
-
-      <RelatedEntries items={related} onSelect={onSelectRecord} />
-
-      <section className="reading-section">
-        <p className="reading-section__eyebrow">Resumo de leitura</p>
-        <p className="reading-footnote">{recordToInspectorSummary(record)}</p>
-      </section>
-    </article>
+    </section>
   );
 }
 
@@ -452,51 +499,49 @@ function FilterSheet({
     </section>
   );
 
-  const body = (
-    <div className="filter-sheet__body">
-      <header className="filter-sheet__header">
-        <div>
-          <p className="filter-sheet__eyebrow">Filtros</p>
-          <h2>Refinar o recorte</h2>
-          <p className="filter-sheet__description">Use chips para limitar as memórias por categoria, importância, tag, entidade, origem e período.</p>
-        </div>
-        <div className="filter-sheet__actions">
-          <button type="button" className="ui-button" onClick={onClear}>
-            Limpar
-          </button>
-          <button ref={closeRef} type="button" className="ui-button ui-button--ghost" onClick={onClose}>
-            Fechar
-          </button>
-        </div>
-      </header>
-
-      <div className="filter-sheet__grid">
-        <FacetGroup title="Categorias" options={facetGroups.categories} activeValue={filters.category} onPick={(value) => onChange({ category: value as MemoryFilters['category'] })} />
-        <FacetGroup title="Importância" options={facetGroups.importance} activeValue={filters.importance} onPick={(value) => onChange({ importance: value as MemoryFilters['importance'] })} />
-        <FacetGroup title="Tags" options={facetGroups.tags} activeValue={filters.tag} onPick={(value) => onChange({ tag: value })} />
-        <FacetGroup title="Entidades" options={facetGroups.entities} activeValue={filters.entity} onPick={(value) => onChange({ entity: value })} />
-        <FacetGroup title="Origem" options={facetGroups.sources} activeValue={filters.source} onPick={(value) => onChange({ source: value })} />
-        <section className="filter-group">
-          <p className="filter-group__eyebrow">Período</p>
-          <div className="filter-group__chips">
-            {(['all', '7d', '30d', '90d', '365d'] as const).map((value) => (
-              <ChipButton
-                key={value}
-                label={value === 'all' ? `Tudo · ${filters.period === 'all' ? 'ativo' : ''}` : PERIOD_LABELS[value]}
-                active={filters.period === value}
-                onClick={() => onChange({ period: value })}
-              />
-            ))}
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-
   return (
     <div className={cx('filter-sheet', 'sheet', compact ? 'sheet--bottom' : 'sheet--drawer')} role="dialog" aria-modal="true" aria-label="Filtros avançados">
       <button type="button" className="sheet__backdrop" aria-label="Fechar filtros" onClick={onClose} />
-      <div className={cx('sheet__panel', compact ? 'sheet__panel--bottom' : 'sheet__panel--drawer')}>{body}</div>
+      <div className={cx('sheet__panel', compact ? 'sheet__panel--bottom' : 'sheet__panel--drawer')}>
+        <div className="filter-sheet__body">
+          <header className="filter-sheet__header">
+            <div>
+              <p className="filter-sheet__eyebrow">Filtros</p>
+              <h2>Refinar o recorte</h2>
+              <p className="filter-sheet__description">Use chips para limitar as memórias por categoria, importância, tag, entidade, origem e período.</p>
+            </div>
+            <div className="filter-sheet__actions">
+              <button type="button" className="ui-button" onClick={onClear}>
+                Limpar
+              </button>
+              <button ref={closeRef} type="button" className="ui-button ui-button--ghost" onClick={onClose}>
+                Fechar
+              </button>
+            </div>
+          </header>
+
+          <div className="filter-sheet__grid">
+            <FacetGroup title="Categorias" options={facetGroups.categories} activeValue={filters.category} onPick={(value) => onChange({ category: value as MemoryFilters['category'] })} />
+            <FacetGroup title="Importância" options={facetGroups.importance} activeValue={filters.importance} onPick={(value) => onChange({ importance: value as MemoryFilters['importance'] })} />
+            <FacetGroup title="Tags" options={facetGroups.tags} activeValue={filters.tag} onPick={(value) => onChange({ tag: value })} />
+            <FacetGroup title="Entidades" options={facetGroups.entities} activeValue={filters.entity} onPick={(value) => onChange({ entity: value })} />
+            <FacetGroup title="Origem" options={facetGroups.sources} activeValue={filters.source} onPick={(value) => onChange({ source: value })} />
+            <section className="filter-group">
+              <p className="filter-group__eyebrow">Período</p>
+              <div className="filter-group__chips">
+                {(['all', '7d', '30d', '90d', '365d'] as const).map((value) => (
+                  <ChipButton
+                    key={value}
+                    label={value === 'all' ? `Tudo · ${filters.period === 'all' ? 'ativo' : ''}` : PERIOD_LABELS[value]}
+                    active={filters.period === value}
+                    onClick={() => onChange({ period: value })}
+                  />
+                ))}
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -516,10 +561,10 @@ export interface AppShellProps {
   timelineGroups: DiaryGroup[];
   selectedRecord: MemoryEntry | null;
   relatedRecords: Array<{ record: MemoryEntry; relation: MemoryRelation }>;
-  readerOpen: boolean;
+  mobileView: 'index' | 'reading';
   filtersOpen: boolean;
   onSelectRecord: (id: string) => void;
-  onBackToTimeline: () => void;
+  onBackToIndex: () => void;
   onQueryChange: (value: string) => void;
   onToggleFilter: (key: keyof MemoryFilters, value: string) => void;
   onPatchFilters: (patch: Partial<MemoryFilters>) => void;
@@ -528,7 +573,7 @@ export interface AppShellProps {
   onCloseFilters: () => void;
 }
 
-export function AppShell({
+function NotebookLayout({
   compact,
   surface,
   onSurfaceChange,
@@ -543,59 +588,52 @@ export function AppShell({
   timelineGroups,
   selectedRecord,
   relatedRecords,
-  readerOpen,
-  filtersOpen,
+  mobileView,
   onSelectRecord,
-  onBackToTimeline,
+  onBackToIndex,
   onQueryChange,
   onToggleFilter,
   onPatchFilters,
   onClearFilters,
   onOpenFilters,
   onCloseFilters,
+  filtersOpen,
 }: AppShellProps) {
-  const openRecord = (id: string) => {
-    onSelectRecord(id);
-  };
-
-  const timeline = (
-    <JournalTimeline
-      groups={timelineGroups}
-      selectedId={selectedRecord?.id ?? null}
-      onSelectRecord={openRecord}
-      onPickTag={(value) => onToggleFilter('tag', value)}
-      onPickEntity={(value) => onToggleFilter('entity', value)}
-    />
-  );
-
-  const reading = (
-    <ReadingView
-      record={selectedRecord}
-      related={relatedRecords}
-      onBack={onBackToTimeline}
-      onSelectRecord={openRecord}
-    />
-  );
+  const indexVisible = !compact || mobileView === 'index';
+  const readingVisible = !compact || mobileView === 'reading';
+  const resultLabelText = `${visibleCount} de ${totalCount}`;
 
   return (
-    <div className={cx('journal-shell', compact && 'journal-shell--compact')}>
-      <TopNavigation syncLabel={syncLabel} syncTone={syncTone} />
+    <div className={cx('notebook-layout', compact && 'notebook-layout--compact')}>
+      {indexVisible ? (
+        <MemoryIndex
+          query={filters.query}
+          onQueryChange={onQueryChange}
+          onOpenFilters={onOpenFilters}
+          activeFilterCount={activeFilterCount}
+          activeFilterSummary={activeFilterSummary}
+          resultLabelText={resultLabelText}
+          surface={surface}
+          onSurfaceChange={onSurfaceChange}
+          syncLabel={syncLabel}
+          syncTone={syncTone}
+          compact={compact}
+          timelineGroups={timelineGroups}
+          selectedId={selectedRecord?.id ?? null}
+          onSelectRecord={onSelectRecord}
+          onPickTag={(value) => onToggleFilter('tag', value)}
+        />
+      ) : null}
 
-      <JournalToolbar
-        query={filters.query}
-        onQueryChange={onQueryChange}
-        onOpenFilters={onOpenFilters}
-        activeFilterCount={activeFilterCount}
-        activeFilterSummary={activeFilterSummary}
-        resultLabelText={resultLabel(visibleCount)}
-        surface={surface}
-        onSurfaceChange={onSurfaceChange}
-        compact={compact}
-      />
-
-      <main className="journal-shell__content">
-        {readerOpen ? reading : timeline}
-      </main>
+      {readingVisible ? (
+        <ReadingPane
+          record={selectedRecord}
+          related={relatedRecords}
+          mobile={compact}
+          onBack={onBackToIndex}
+          onSelectRecord={onSelectRecord}
+        />
+      ) : null}
 
       <FilterSheet
         open={filtersOpen}
@@ -606,10 +644,14 @@ export function AppShell({
         onClear={onClearFilters}
         onClose={onCloseFilters}
       />
+    </div>
+  );
+}
 
-      <p className="journal-shell__sr-only">
-        {totalCount} memórias no acervo.
-      </p>
+export function AppShell(props: AppShellProps) {
+  return (
+    <div className={cx('notebook-shell', props.compact && 'notebook-shell--compact')}>
+      <NotebookLayout {...props} />
     </div>
   );
 }
