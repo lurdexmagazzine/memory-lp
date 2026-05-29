@@ -152,7 +152,12 @@ function MemoryListItem({
 
   return (
     <article className={cx('memory-list-item', active && 'is-active')}>
-      <button type="button" className="memory-list-item__body" onClick={onSelect}>
+      <button
+        type="button"
+        className="memory-list-item__body"
+        onClick={onSelect}
+        aria-current={active ? 'true' : undefined}
+      >
         <div className="memory-list-item__top">
           <span className="memory-list-item__date">{formatShortDateLabel(record.createdAtMs)}</span>
           <span className="memory-list-item__source">{sourceLabel(record.source)}</span>
@@ -268,6 +273,14 @@ function MemoryIndex({
   onSelectRecord: (id: string) => void;
   onPickTag: (value: string) => void;
 }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (compact || !selectedId) return;
+    const activeButton = scrollRef.current?.querySelector<HTMLElement>('.memory-list-item.is-active .memory-list-item__body');
+    activeButton?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [compact, selectedId, timelineGroups.length]);
+
   return (
     <section className={cx('index-pane', compact && 'index-pane--compact')} aria-label="Índice de memórias">
       <IndexToolbar
@@ -284,7 +297,7 @@ function MemoryIndex({
         compact={compact}
       />
 
-      <div className="index-pane__scroll">
+      <div ref={scrollRef} className="index-pane__scroll">
         {timelineGroups.length ? (
           <section className="timeline-stack" aria-label="Timeline do diário e das memórias">
             {timelineGroups.map((group) => (
