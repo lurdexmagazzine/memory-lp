@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { AppSurface, MemoryDataset, MemoryEntry, MemoryFilters, MemoryRelation } from './types';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { AppSurface, DiaryEntry, DiaryGroup, MemoryDataset, MemoryEntry, MemoryFilters, MemoryRelation } from './types';
 import {
-  buildDiaryEntries,
-  buildDiaryGroups,
   buildFacetGroups,
+  formatDiaryDateHeading,
+  formatTimeLabel,
+  getRelatedRecords,
   loadMemoryDataset,
   matchesFilters,
   scoreSearchMatch,
   selectFallbackRecord,
-  formatTimeLabel,
+  CATEGORY_LABELS,
+  IMPORTANCE_LABELS,
   PERIOD_LABELS,
   excerpt,
 } from './lib/memory';
@@ -55,33 +57,77 @@ function useMediaQuery(query: string): boolean {
   return matches;
 }
 
-function labelSource(source: string): string {
+function sourceLabel(source: string): string {
   return source === 'holographic' ? 'Holographic' : source;
 }
 
-function sortRecords(records: MemoryEntry[], query: string): MemoryEntry[] {
+function sortRecords(records: MemoryEntry[], surface: AppSurface, query: string): MemoryEntry[] {
   const needle = query.trim();
   return [...records].sort((a, b) => {
-    if (needle) {
-      const scoreDiff = scoreSearchMatch(b, needle) - scoreSearchMatch(a, needle);
-      if (scoreDiff !== 0) return scoreDiff;
+    if (surface === 'memories') {
+      if (needle) {
+        const scoreDiff = scoreSearchMatch(b, needle) - scoreSearchMatch(a, needle);
+        if (scoreDiff !== 0) return scoreDiff;
+      }
+
+      if (b.importanceScore !== a.importanceScore) return b.importanceScore - a.importanceScore;
+      if ((b.createdAtMs ?? 0) !== (a.createdAtMs ?? 0)) return (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0);
+      if ((b.updatedAtMs ?? 0) !== (a.updatedAtMs ?? 0)) return (b.updatedAtMs ?? 0) - (a.updatedAtMs ?? 0);
+      return a.title.localeCompare(b.title, 'pt-BR');
     }
 
-    if (b.importanceScore !== a.importanceScore) return b.importanceScore - a.importanceScore;
-    if ((b.updatedAtMs ?? 0) !== (a.updatedAtMs ?? 0)) return (b.updatedAtMs ?? 0) - (a.updatedAtMs ?? 0);
     if ((b.createdAtMs ?? 0) !== (a.createdAtMs ?? 0)) return (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0);
+    if ((b.updatedAtMs ?? 0) !== (a.updatedAtMs ?? 0)) return (b.updatedAtMs ?? 0) - (a.updatedAtMs ?? 0);
+    if (b.importanceScore !== a.importanceScore) return b.importanceScore - a.importanceScore;
     return a.title.localeCompare(b.title, 'pt-BR');
   });
 }
 
+function toDiaryEntry(record: MemoryEntry): DiaryEntry {
+  const dateKey = record.createdAtMs ? new Date(record.createdAtMs).toISOString().slice(0, 10) : 'sem-data';
+  return {
+    id: `diary:${record.id}`,
+    memoryId: record.id,
+    dateKey,
+    dateLabel: formatDiaryDateHeading(dateKey),
+    title: record.title,
+    excerpt: record.summary,
+    category: record.category,
+    tags: record.tags,
+    entities: record.entities,
+    importance: record.importance,
+    source: record.source,
+    createdAtMs: record.createdAtMs,
+  };
+}
+
+function buildTimelineGroups(records: MemoryEntry[]): DiaryGroup[] {
+  const buckets = new Map<string, DiaryEntry[]>();
+
+  for (const record of records) {
+    const entry = toDiaryEntry(record);
+    const current = buckets.get(entry.dateKey) ?? [];
+    current.push(entry);
+    buckets.set(entry.dateKey, current);
+  }
+
+  return [...buckets.entries()]
+    .map(([key, entries]) => ({
+      key,
+      label: formatDiaryDateHeading(key),
+      entries,
+    }))
+    .sort((a, b) => b.key.localeCompare(a.key));
+}
+
 function buildFilterSummary(filters: MemoryFilters): string[] {
   const labels: string[] = [];
-  if (filters.query.trim()) labels.push(`Busca: ${excerpt(filters.query.trim(), 20)}`);
-  if (filters.category !== 'all') labels.push(`Categoria: ${filters.category}`);
-  if (filters.importance !== 'all') labels.push(`Importância: ${filters.importance}`);
+  if (filters.query.trim()) labels.push(`Busca: ${excerpt(filters.query.trim(), 18)}`);
+  if (filters.category !== 'all') labels.push(`Categoria: ${CATEGORY_LABELS[filters.category]}`);
+  if (filters.importance !== 'all') labels.push(`Importância: ${IMPORTANCE_LABELS[filters.importance]}`);
   if (filters.tag !== 'all') labels.push(`Tag: ${filters.tag}`);
   if (filters.entity !== 'all') labels.push(`Entidade: ${filters.entity}`);
-  if (filters.source !== 'all') labels.push(`Origem: ${labelSource(filters.source)}`);
+  if (filters.source !== 'all') labels.push(`Origem: ${sourceLabel(filters.source)}`);
   if (filters.period !== 'all') labels.push(`Período: ${PERIOD_LABELS[filters.period]}`);
   return labels;
 }
@@ -92,11 +138,12 @@ function App() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
   const [reloadTick, setReloadTick] = useState(0);
-  const [surface, setSurface] = useState<AppSurface>('memories');
+  const [surface, setSurface] = useState<AppSurface>('diary');
   const [filters, setFilters] = useState<MemoryFilters>(DEFAULT_FILTERS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [readerOpen, setReaderOpen] = useState(false);
+  const [readerId, setReaderId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const scrollAnchorRef = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -124,19 +171,20 @@ function App() {
   }, [reloadTick]);
 
   useEffect(() => {
-    document.body.classList.toggle('is-sheet-open', !desktop && (readerOpen || filtersOpen));
+    document.body.classList.toggle('is-sheet-open', filtersOpen);
     return () => {
       document.body.classList.remove('is-sheet-open');
     };
-  }, [desktop, readerOpen, filtersOpen]);
+  }, [filtersOpen]);
 
   const visibleRecords = useMemo(() => {
     if (!dataset) return [];
     const filtered = dataset.records.filter((record) => matchesFilters(record, filters));
-    return sortRecords(filtered, filters.query);
-  }, [dataset, filters]);
+    return sortRecords(filtered, surface, filters.query);
+  }, [dataset, filters, surface]);
 
   const facetGroups = useMemo(() => buildFacetGroups(visibleRecords), [visibleRecords]);
+  const timelineGroups = useMemo(() => buildTimelineGroups(visibleRecords), [visibleRecords]);
 
   const visibleRelations = useMemo(() => {
     if (!dataset) return [] as MemoryRelation[];
@@ -144,51 +192,44 @@ function App() {
     return dataset.relations.filter((relation) => visibleIds.has(relation.fromId) && visibleIds.has(relation.toId));
   }, [dataset, visibleRecords]);
 
-  const diaryEntries = useMemo(() => buildDiaryEntries(visibleRecords), [visibleRecords]);
-  const diaryGroups = useMemo(() => buildDiaryGroups(diaryEntries), [diaryEntries]);
+  const selectedRecord = useMemo(() => {
+    if (!visibleRecords.length) return null;
+    const byId = selectedId ? visibleRecords.find((record) => record.id === selectedId) : null;
+    return byId ?? selectFallbackRecord(visibleRecords) ?? null;
+  }, [selectedId, visibleRecords]);
+
+  const relatedRecords = useMemo(() => {
+    if (!readerId) return [] as Array<{ record: MemoryEntry; relation: MemoryRelation }>;
+    return getRelatedRecords(readerId, visibleRelations, visibleRecords, 6);
+  }, [readerId, visibleRelations, visibleRecords]);
 
   useEffect(() => {
     if (!visibleRecords.length) {
       setSelectedId(null);
-      setReaderOpen(false);
+      setReaderId(null);
       return;
     }
 
-    setSelectedId((current) => {
-      if (current && visibleRecords.some((record) => record.id === current)) return current;
-      return selectFallbackRecord(visibleRecords)?.id ?? visibleRecords[0].id;
-    });
-  }, [visibleRecords]);
-
-  const selectedRecord = useMemo(() => {
-    if (!visibleRecords.length) return null;
-    const current = selectedId ? visibleRecords.find((record) => record.id === selectedId) : null;
-    return current ?? selectFallbackRecord(visibleRecords) ?? visibleRecords[0] ?? null;
-  }, [selectedId, visibleRecords]);
-
-  const relatedRecords = useMemo(() => {
-    if (!selectedRecord) return [] as Array<{ record: MemoryEntry; relation: MemoryRelation }>;
-    const related = visibleRelations
-      .filter((relation) => relation.fromId === selectedRecord.id || relation.toId === selectedRecord.id)
-      .sort((a, b) => b.weight - a.weight);
-
-    const seen = new Set<string>();
-    const result: Array<{ record: MemoryEntry; relation: MemoryRelation }> = [];
-    for (const relation of related) {
-      const counterpartId = relation.fromId === selectedRecord.id ? relation.toId : relation.fromId;
-      if (seen.has(counterpartId)) continue;
-      const record = visibleRecords.find((item) => item.id === counterpartId);
-      if (!record) continue;
-      seen.add(counterpartId);
-      result.push({ record, relation });
-      if (result.length >= 6) break;
+    if (!selectedId || !visibleRecords.some((record) => record.id === selectedId)) {
+      const fallback = selectFallbackRecord(visibleRecords) ?? visibleRecords[0] ?? null;
+      setSelectedId(fallback?.id ?? null);
     }
-    return result;
-  }, [selectedRecord, visibleRelations, visibleRecords]);
+
+    if (readerId && !visibleRecords.some((record) => record.id === readerId)) {
+      setReaderId(null);
+    }
+  }, [visibleRecords, selectedId, readerId]);
+
+  useEffect(() => {
+    if (readerId === null) {
+      return;
+    }
+
+    window.scrollTo(0, 0);
+  }, [readerId]);
 
   const totalCount = dataset?.records.length ?? 0;
   const visibleCount = visibleRecords.length;
-  const relationCount = visibleRelations.length;
   const activeFilterSummary = useMemo(() => buildFilterSummary(filters), [filters]);
   const activeFilterCount = activeFilterSummary.length;
   const syncTone: PillTone =
@@ -228,12 +269,23 @@ function App() {
     setFilters(DEFAULT_FILTERS);
   };
 
-  const selectRecord = (id: string) => {
+  const openRecord = (id: string) => {
+    const wasReading = readerId !== null;
     setSelectedId(id);
+    if (!wasReading) {
+      scrollAnchorRef.current = window.scrollY;
+    }
+    setReaderId(id);
+    window.scrollTo(0, 0);
   };
 
-  const openReader = () => setReaderOpen(true);
-  const closeReader = () => setReaderOpen(false);
+  const backToTimeline = () => {
+    setReaderId(null);
+    window.requestAnimationFrame(() => {
+      window.scrollTo(0, scrollAnchorRef.current);
+    });
+  };
+
   const openFilters = () => setFiltersOpen(true);
   const closeFilters = () => setFiltersOpen(false);
 
@@ -253,33 +305,33 @@ function App() {
 
   return (
     <AppShell
-      mobile={!desktop}
+      compact={!desktop}
       surface={surface}
-      onSurfaceChange={setSurface}
+      onSurfaceChange={(nextSurface) => {
+        setSurface(nextSurface);
+        setReaderId(null);
+      }}
       syncLabel={syncLabel}
       syncTone={syncTone}
       totalCount={totalCount}
       visibleCount={visibleCount}
-      relationCount={relationCount}
       activeFilterSummary={activeFilterSummary}
       activeFilterCount={activeFilterCount}
       filters={filters}
       facetGroups={facetGroups}
-      records={visibleRecords}
-      diaryGroups={diaryGroups}
+      timelineGroups={timelineGroups}
       selectedRecord={selectedRecord}
       relatedRecords={relatedRecords}
-      onSelectRecord={selectRecord}
+      readerOpen={readerId !== null}
+      filtersOpen={filtersOpen}
+      onSelectRecord={openRecord}
+      onBackToTimeline={backToTimeline}
       onQueryChange={(value) => patchFilters({ query: value })}
       onToggleFilter={toggleFilter}
       onPatchFilters={patchFilters}
       onClearFilters={clearFilters}
       onOpenFilters={openFilters}
       onCloseFilters={closeFilters}
-      onOpenReader={openReader}
-      onCloseReader={closeReader}
-      readerOpen={readerOpen}
-      filtersOpen={filtersOpen}
     />
   );
 }

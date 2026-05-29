@@ -65,6 +65,11 @@ const shortDateFormatter = new Intl.DateTimeFormat('pt-BR', {
   month: 'short',
 });
 
+const diaryDateFormatter = new Intl.DateTimeFormat('pt-BR', {
+  day: 'numeric',
+  month: 'long',
+});
+
 const timeFormatter = new Intl.DateTimeFormat('pt-BR', {
   hour: '2-digit',
   minute: '2-digit',
@@ -716,6 +721,11 @@ export function getPeriodCutoff(period: Exclude<MemoryFilters['period'], 'all'>)
     default:
       return null;
   }
+}
+
+export function formatDiaryDateHeading(dateKey: string): string {
+  if (dateKey === 'sem-data') return 'Sem data';
+  return diaryDateFormatter.format(new Date(`${dateKey}T00:00:00`));
 }
 
 export function formatRelativeDate(dateKey: string): string {
