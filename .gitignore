@@ -1,0 +1,6 @@
+memory_store.db
+*.db-wal
+*.db-shm
+.DS_Store
+dist/
+node_modules/
