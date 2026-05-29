@@ -1,7 +1,9 @@
 import type {
   DiaryEntry,
+  DiaryGroup,
   Entity,
   EntityKind,
+  FacetOption,
   ImportanceLevel,
   MemoryCategory,
   MemoryDataset,
@@ -203,6 +205,8 @@ function makeSearchText(record: {
     record.source,
     record.createdAt,
     record.updatedAt,
+    record.summary ?? '',
+    record.importance ?? '',
     formatDateLabel(record.createdAtMs),
     formatShortDateLabel(record.createdAtMs),
   ]
@@ -421,6 +425,160 @@ export function buildDiaryEntries(records: MemoryEntry[]): DiaryEntry[] {
       source: record.source,
       createdAtMs: record.createdAtMs,
     }));
+}
+
+export function buildDiaryGroups(entries: DiaryEntry[]): DiaryGroup[] {
+  const buckets = new Map<string, DiaryEntry[]>();
+
+  for (const entry of entries) {
+    const bucket = buckets.get(entry.dateKey) ?? [];
+    bucket.push(entry);
+    buckets.set(entry.dateKey, bucket);
+  }
+
+  return [...buckets.entries()]
+    .map(([key, items]) => ({
+      key,
+      label: formatRelativeDate(key),
+      entries: [...items].sort((a, b) => (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0)),
+    }))
+    .sort((a, b) => b.key.localeCompare(a.key));
+}
+
+export interface FacetGroups {
+  categories: FacetOption[];
+  importance: FacetOption[];
+  tags: FacetOption[];
+  entities: FacetOption[];
+  sources: FacetOption[];
+}
+
+export function buildFacetGroups(records: MemoryEntry[]): FacetGroups {
+  const categoryCounts = new Map<MemoryCategory, number>();
+  const importanceCounts = new Map<ImportanceLevel, number>();
+  const tagCounts = new Map<string, number>();
+  const entityCounts = new Map<string, { label: string; count: number }>();
+  const sourceCounts = new Map<string, number>();
+
+  for (const record of records) {
+    categoryCounts.set(record.category, (categoryCounts.get(record.category) ?? 0) + 1);
+    importanceCounts.set(record.importance, (importanceCounts.get(record.importance) ?? 0) + 1);
+    sourceCounts.set(record.source, (sourceCounts.get(record.source) ?? 0) + 1);
+
+    for (const tag of record.tags) {
+      tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+    }
+
+    for (const entity of record.entities) {
+      const key = entity.toLowerCase();
+      const current = entityCounts.get(key);
+      if (current) {
+        current.count += 1;
+      } else {
+        entityCounts.set(key, { label: entity, count: 1 });
+      }
+    }
+  }
+
+  const categories: FacetOption[] = [
+    { value: 'all', label: 'Todas', count: records.length },
+    ...CATEGORY_ORDER.map((category) => ({
+      value: category,
+      label: CATEGORY_LABELS[category],
+      count: categoryCounts.get(category) ?? 0,
+    })).filter((option) => option.count > 0),
+  ];
+
+  const importance: FacetOption[] = [
+    { value: 'all', label: 'Todas', count: records.length },
+    { value: 'anchor', label: IMPORTANCE_LABELS.anchor, count: importanceCounts.get('anchor') ?? 0 },
+    { value: 'high', label: IMPORTANCE_LABELS.high, count: importanceCounts.get('high') ?? 0 },
+    { value: 'medium', label: IMPORTANCE_LABELS.medium, count: importanceCounts.get('medium') ?? 0 },
+    { value: 'low', label: IMPORTANCE_LABELS.low, count: importanceCounts.get('low') ?? 0 },
+  ].filter((option) => option.count > 0 || option.value === 'all');
+
+  const tags: FacetOption[] = [
+    { value: 'all', label: 'Todas', count: records.length },
+    ...[...tagCounts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'))
+      .slice(0, 12)
+      .map(([label, count]) => ({ value: label, label, count })),
+  ];
+
+  const entities: FacetOption[] = [
+    { value: 'all', label: 'Todas', count: records.length },
+    ...[...entityCounts.values()]
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'pt-BR'))
+      .slice(0, 12)
+      .map(({ label, count }) => ({ value: label, label, count })),
+  ];
+
+  const sources: FacetOption[] = [
+    { value: 'all', label: 'Todas', count: records.length },
+    ...[...sourceCounts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'))
+      .map(([label, count]) => ({ value: label, label: labelSource(label), count })),
+  ];
+
+  return { categories, importance, tags, entities, sources };
+}
+
+function labelSource(source: string): string {
+  return source === 'holographic' ? 'Holographic' : source;
+}
+
+export function scoreSearchMatch(record: MemoryEntry, query: string): number {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return 0;
+
+  let score = 0;
+  const title = record.title.toLowerCase();
+  const content = record.content.toLowerCase();
+  const summary = record.summary.toLowerCase();
+  const tags = record.tags.map((tag) => tag.toLowerCase());
+  const entities = record.entities.map((entity) => entity.toLowerCase());
+  const source = record.source.toLowerCase();
+  const created = `${formatDateLabel(record.createdAtMs)} ${formatShortDateLabel(record.createdAtMs)}`.toLowerCase();
+  const updated = `${formatDateLabel(record.updatedAtMs)} ${formatShortDateLabel(record.updatedAtMs)}`.toLowerCase();
+
+  if (title.includes(needle)) {
+    score += title.startsWith(needle) ? 90 : 70;
+  }
+  if (content.includes(needle)) score += 30;
+  if (summary.includes(needle)) score += 24;
+  if (tags.some((tag) => tag.includes(needle))) score += 36;
+  if (entities.some((entity) => entity.includes(needle))) score += 34;
+  if (source.includes(needle)) score += 10;
+  if (created.includes(needle) || updated.includes(needle)) score += 16;
+  if (record.category.includes(needle)) score += 12;
+  if (record.searchText.includes(needle)) score += 8;
+
+  return score;
+}
+
+export function getRelatedRecords(
+  recordId: string,
+  relations: MemoryRelation[],
+  records: MemoryEntry[],
+  limit = MAX_RELATIONS_PER_NODE,
+): Array<{ record: MemoryEntry; relation: MemoryRelation }> {
+  const seen = new Set<string>();
+  const pairs: Array<{ record: MemoryEntry; relation: MemoryRelation }> = [];
+
+  for (const relation of [...relations].sort((a, b) => b.weight - a.weight)) {
+    if (pairs.length >= limit) break;
+    if (relation.fromId !== recordId && relation.toId !== recordId) continue;
+
+    const counterpartId = relation.fromId === recordId ? relation.toId : relation.fromId;
+    if (seen.has(counterpartId)) continue;
+    const record = records.find((item) => item.id === counterpartId);
+    if (!record) continue;
+
+    seen.add(counterpartId);
+    pairs.push({ record, relation });
+  }
+
+  return pairs;
 }
 
 export function buildMemoryDataset(raw: unknown, sourceKind: MemoryDataset['sourceKind'] = 'snapshot'): MemoryDataset {

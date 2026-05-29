@@ -125,3 +125,17 @@ export interface MemoryFilters {
   entity: string | 'all';
   tag: string | 'all';
 }
+
+export type AppSurface = 'memories' | 'diary';
+
+export interface DiaryGroup {
+  key: string;
+  label: string;
+  entries: DiaryEntry[];
+}
+
+export interface FacetOption {
+  value: string;
+  label: string;
+  count: number;
+}

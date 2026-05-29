@@ -1,25 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { BrainSurface, ImportanceLevel, MemoryCategory, MemoryDataset, MemoryFilters, MemoryEntry, MemoryRelation, PeriodFilter } from './types';
+import type { AppSurface, MemoryDataset, MemoryEntry, MemoryFilters, MemoryRelation } from './types';
 import {
-  CATEGORY_LABELS,
-  CATEGORY_ORDER,
-  IMPORTANCE_LABELS,
-  PERIOD_LABELS,
   buildDiaryEntries,
-  excerpt,
-  formatTimeLabel,
+  buildDiaryGroups,
+  buildFacetGroups,
   loadMemoryDataset,
   matchesFilters,
+  scoreSearchMatch,
   selectFallbackRecord,
+  formatTimeLabel,
+  PERIOD_LABELS,
+  excerpt,
 } from './lib/memory';
-import { BrainView } from './components/BrainView';
-import { DiaryView } from './components/DiaryView';
-import { EmptyState } from './components/common';
-import { FilterDrawer, FilterToolbar } from './components/FilterBar';
-import { InspectorPanel } from './components/InspectorPanel';
-import { MobileBottomNav } from './components/MobileBottomNav';
-import { ShellSidebar } from './components/ShellSidebar';
-import { TopBar } from './components/TopBar';
+import { AppShell } from './components/AppShell';
+import { ErrorState, LoadingState } from './components/common';
+import type { PillTone } from './components/common';
 
 const DEFAULT_FILTERS: MemoryFilters = {
   query: '',
@@ -64,456 +59,228 @@ function labelSource(source: string): string {
   return source === 'holographic' ? 'Holographic' : source;
 }
 
-function syncLabelFromDataset(
-  dataset: MemoryDataset | null,
-  loadState: 'loading' | 'ready' | 'error',
-  errorMessage: string,
-): { label: string; tone: 'neutral' | 'good' | 'warning' | 'danger' | 'accent' } {
-  if (loadState === 'loading') return { label: 'carregando acervo…', tone: 'accent' };
-  if (loadState === 'error') return { label: 'falha no snapshot', tone: 'danger' };
-  if (!dataset) return { label: 'sem dados', tone: 'warning' };
-  if (dataset.issues.some((issue) => issue.severity === 'error')) return { label: 'snapshot com erro', tone: 'danger' };
-  if (dataset.issues.some((issue) => issue.severity === 'warning')) return { label: 'snapshot com alertas', tone: 'warning' };
-  if (errorMessage) return { label: 'última leitura preservada', tone: 'warning' };
+function sortRecords(records: MemoryEntry[], query: string): MemoryEntry[] {
+  const needle = query.trim();
+  return [...records].sort((a, b) => {
+    if (needle) {
+      const scoreDiff = scoreSearchMatch(b, needle) - scoreSearchMatch(a, needle);
+      if (scoreDiff !== 0) return scoreDiff;
+    }
 
-  const loadedAt = new Date(dataset.loadedAt).getTime();
-  const timeLabel = Number.isFinite(loadedAt) ? formatTimeLabel(loadedAt) : 'agora';
-  return { label: `sincronizado às ${timeLabel}`, tone: 'good' };
+    if (b.importanceScore !== a.importanceScore) return b.importanceScore - a.importanceScore;
+    if ((b.updatedAtMs ?? 0) !== (a.updatedAtMs ?? 0)) return (b.updatedAtMs ?? 0) - (a.updatedAtMs ?? 0);
+    if ((b.createdAtMs ?? 0) !== (a.createdAtMs ?? 0)) return (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0);
+    return a.title.localeCompare(b.title, 'pt-BR');
+  });
 }
 
-function activeFilterLabels(filters: MemoryFilters): string[] {
+function buildFilterSummary(filters: MemoryFilters): string[] {
   const labels: string[] = [];
-
-  if (filters.query.trim()) labels.push(`Busca: ${excerpt(filters.query.trim(), 18)}`);
-  if (filters.category !== 'all') labels.push(`Categoria: ${CATEGORY_LABELS[filters.category]}`);
-  if (filters.importance !== 'all') labels.push(`Importância: ${IMPORTANCE_LABELS[filters.importance]}`);
+  if (filters.query.trim()) labels.push(`Busca: ${excerpt(filters.query.trim(), 20)}`);
+  if (filters.category !== 'all') labels.push(`Categoria: ${filters.category}`);
+  if (filters.importance !== 'all') labels.push(`Importância: ${filters.importance}`);
+  if (filters.tag !== 'all') labels.push(`Tag: ${filters.tag}`);
+  if (filters.entity !== 'all') labels.push(`Entidade: ${filters.entity}`);
   if (filters.source !== 'all') labels.push(`Origem: ${labelSource(filters.source)}`);
   if (filters.period !== 'all') labels.push(`Período: ${PERIOD_LABELS[filters.period]}`);
-  if (filters.entity !== 'all') labels.push(`Entidade: ${filters.entity}`);
-  if (filters.tag !== 'all') labels.push(`Tag: ${filters.tag}`);
-
   return labels;
 }
 
 function App() {
-  const isMobile = useMediaQuery('(max-width: 979px)');
+  const desktop = useMediaQuery('(min-width: 1200px)');
   const [dataset, setDataset] = useState<MemoryDataset | null>(null);
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
+  const [reloadTick, setReloadTick] = useState(0);
+  const [surface, setSurface] = useState<AppSurface>('memories');
   const [filters, setFilters] = useState<MemoryFilters>(DEFAULT_FILTERS);
-  const [surface, setSurface] = useState<BrainSurface>('brain');
-  const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [inspectedId, setInspectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [readerOpen, setReaderOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
+    let active = true;
 
-    loadMemoryDataset()
-      .then((nextDataset) => {
-        if (cancelled) return;
+    setStatus('loading');
+    setErrorMessage('');
+
+    (async () => {
+      try {
+        const nextDataset = await loadMemoryDataset();
+        if (!active) return;
         setDataset(nextDataset);
-        setLoadState('ready');
-        setErrorMessage('');
-      })
-      .catch((error) => {
-        if (cancelled) return;
+        setStatus('ready');
+      } catch (error) {
+        if (!active) return;
         setDataset(null);
-        setLoadState('error');
+        setStatus('error');
         setErrorMessage(error instanceof Error ? error.message : 'Erro desconhecido');
-      });
+      }
+    })();
 
     return () => {
-      cancelled = true;
+      active = false;
     };
-  }, []);
+  }, [reloadTick]);
 
   useEffect(() => {
-    const shouldLockScroll = filtersOpen || (isMobile && mobileInspectorOpen);
-    document.body.classList.toggle('is-inspector-open', shouldLockScroll);
-
+    document.body.classList.toggle('is-sheet-open', !desktop && (readerOpen || filtersOpen));
     return () => {
-      document.body.classList.remove('is-inspector-open');
+      document.body.classList.remove('is-sheet-open');
     };
-  }, [filtersOpen, isMobile, mobileInspectorOpen]);
+  }, [desktop, readerOpen, filtersOpen]);
 
   const visibleRecords = useMemo(() => {
     if (!dataset) return [];
-    return dataset.records.filter((record) => matchesFilters(record, filters));
+    const filtered = dataset.records.filter((record) => matchesFilters(record, filters));
+    return sortRecords(filtered, filters.query);
   }, [dataset, filters]);
 
-  const visibleRecordIds = useMemo(() => new Set(visibleRecords.map((record) => record.id)), [visibleRecords]);
+  const facetGroups = useMemo(() => buildFacetGroups(visibleRecords), [visibleRecords]);
 
   const visibleRelations = useMemo(() => {
     if (!dataset) return [] as MemoryRelation[];
-    return dataset.relations.filter((relation) => visibleRecordIds.has(relation.fromId) && visibleRecordIds.has(relation.toId));
-  }, [dataset, visibleRecordIds]);
+    const visibleIds = new Set(visibleRecords.map((record) => record.id));
+    return dataset.relations.filter((relation) => visibleIds.has(relation.fromId) && visibleIds.has(relation.toId));
+  }, [dataset, visibleRecords]);
 
-  const visibleEntities = useMemo(() => {
-    if (!dataset) return [];
-    return dataset.entities.filter((entity) => entity.memoryIds.some((id) => visibleRecordIds.has(id)));
-  }, [dataset, visibleRecordIds]);
-
-  const visibleDiaryEntries = useMemo(() => buildDiaryEntries(visibleRecords), [visibleRecords]);
-
-  const fallbackRecord = useMemo(() => selectFallbackRecord(visibleRecords), [visibleRecords]);
-
-  const focusRecord = useMemo(() => {
-    if (!visibleRecords.length) return null;
-    return visibleRecords.find((record) => record.id === focusedId) ?? fallbackRecord ?? visibleRecords[0];
-  }, [focusedId, fallbackRecord, visibleRecords]);
-
-  const inspectedRecord = useMemo(() => {
-    if (!inspectedId) return null;
-    return visibleRecords.find((record) => record.id === inspectedId) ?? null;
-  }, [inspectedId, visibleRecords]);
+  const diaryEntries = useMemo(() => buildDiaryEntries(visibleRecords), [visibleRecords]);
+  const diaryGroups = useMemo(() => buildDiaryGroups(diaryEntries), [diaryEntries]);
 
   useEffect(() => {
     if (!visibleRecords.length) {
-      setFocusedId(null);
-      setInspectedId(null);
-      setMobileInspectorOpen(false);
+      setSelectedId(null);
+      setReaderOpen(false);
       return;
     }
 
-    const focusedStillVisible = focusedId ? visibleRecords.some((record) => record.id === focusedId) : false;
-    if (!focusedStillVisible) {
-      setFocusedId(fallbackRecord?.id ?? visibleRecords[0].id);
-    }
+    setSelectedId((current) => {
+      if (current && visibleRecords.some((record) => record.id === current)) return current;
+      return selectFallbackRecord(visibleRecords)?.id ?? visibleRecords[0].id;
+    });
+  }, [visibleRecords]);
 
-    if (inspectedId && !visibleRecords.some((record) => record.id === inspectedId)) {
-      setInspectedId(null);
-      setMobileInspectorOpen(false);
+  const selectedRecord = useMemo(() => {
+    if (!visibleRecords.length) return null;
+    const current = selectedId ? visibleRecords.find((record) => record.id === selectedId) : null;
+    return current ?? selectFallbackRecord(visibleRecords) ?? visibleRecords[0] ?? null;
+  }, [selectedId, visibleRecords]);
+
+  const relatedRecords = useMemo(() => {
+    if (!selectedRecord) return [] as Array<{ record: MemoryEntry; relation: MemoryRelation }>;
+    const related = visibleRelations
+      .filter((relation) => relation.fromId === selectedRecord.id || relation.toId === selectedRecord.id)
+      .sort((a, b) => b.weight - a.weight);
+
+    const seen = new Set<string>();
+    const result: Array<{ record: MemoryEntry; relation: MemoryRelation }> = [];
+    for (const relation of related) {
+      const counterpartId = relation.fromId === selectedRecord.id ? relation.toId : relation.fromId;
+      if (seen.has(counterpartId)) continue;
+      const record = visibleRecords.find((item) => item.id === counterpartId);
+      if (!record) continue;
+      seen.add(counterpartId);
+      result.push({ record, relation });
+      if (result.length >= 6) break;
     }
-  }, [fallbackRecord?.id, focusedId, inspectedId, visibleRecords]);
+    return result;
+  }, [selectedRecord, visibleRelations, visibleRecords]);
 
   const totalCount = dataset?.records.length ?? 0;
   const visibleCount = visibleRecords.length;
-  const activeFilterLabelsList = useMemo(() => activeFilterLabels(filters), [filters]);
-  const activeFilterCount = activeFilterLabelsList.length;
-  const syncState = useMemo(() => syncLabelFromDataset(dataset, loadState, errorMessage), [dataset, errorMessage, loadState]);
-  const selectedTitle = focusRecord?.title ?? 'Nenhuma memória selecionada';
+  const relationCount = visibleRelations.length;
+  const activeFilterSummary = useMemo(() => buildFilterSummary(filters), [filters]);
+  const activeFilterCount = activeFilterSummary.length;
+  const syncTone: PillTone =
+    status === 'error'
+      ? 'danger'
+      : dataset?.issues.some((issue) => issue.severity === 'error')
+        ? 'danger'
+        : dataset?.issues.some((issue) => issue.severity === 'warning')
+          ? 'warning'
+          : 'good';
+  const syncLabel =
+    status === 'loading'
+      ? 'carregando…'
+      : status === 'error'
+        ? 'erro ao carregar'
+        : `sincronizado às ${formatTimeLabel(dataset ? new Date(dataset.loadedAt).getTime() : Date.now())}`;
 
-  const categoryOptions = useMemo(() => {
-    if (!dataset) return [{ value: 'all', label: 'Todas', count: 0 }];
+  const patchFilters = (patch: Partial<MemoryFilters>) => {
+    setFilters((previous) => ({ ...previous, ...patch }));
+  };
 
-    const counts = dataset.records.reduce<Record<string, number>>((accumulator, record) => {
-      accumulator[record.category] = (accumulator[record.category] ?? 0) + 1;
-      return accumulator;
-    }, {});
+  const toggleFilter = (key: keyof MemoryFilters, value: string) => {
+    setFilters((previous) => {
+      if (key === 'query') {
+        return { ...previous, query: value };
+      }
 
-    return [
-      { value: 'all', label: 'Todas', count: dataset.records.length },
-      ...CATEGORY_ORDER.map((category) => ({ value: category, label: CATEGORY_LABELS[category], count: counts[category] ?? 0 })).filter((option) => option.count > 0),
-    ];
-  }, [dataset]);
+      const current = previous[key] as string;
+      return {
+        ...previous,
+        [key]: current === value ? 'all' : value,
+      } as MemoryFilters;
+    });
+  };
 
-  const importanceOptions = useMemo(() => {
-    if (!dataset) return [{ value: 'all', label: 'Todas', count: 0 }];
-    return [
-      { value: 'all', label: 'Todas', count: dataset.records.length },
-      ...(['anchor', 'high', 'medium', 'low'] as ImportanceLevel[]).map((importance) => ({
-        value: importance,
-        label: IMPORTANCE_LABELS[importance],
-        count: dataset.stats.importance[importance],
-      })),
-    ];
-  }, [dataset]);
-
-  const sourceOptions = useMemo(() => {
-    if (!dataset) return [{ value: 'all', label: 'Todas', count: 0 }];
-    return [
-      { value: 'all', label: 'Todas', count: dataset.records.length },
-      ...Object.entries(dataset.stats.sources).map(([source, count]) => ({ value: source, label: labelSource(source), count })),
-    ];
-  }, [dataset]);
-
-  const periodOptions = useMemo(
-    () =>
-      ([
-        { value: 'all', label: PERIOD_LABELS.all, count: visibleRecords.length },
-        { value: '7d', label: PERIOD_LABELS['7d'] },
-        { value: '30d', label: PERIOD_LABELS['30d'] },
-        { value: '90d', label: PERIOD_LABELS['90d'] },
-        { value: '365d', label: PERIOD_LABELS['365d'] },
-      ] as Array<{ value: string; label: string; count?: number }>),
-    [visibleRecords.length],
-  );
-
-  const entityOptions = useMemo(() => {
-    const entities = visibleEntities
-      .filter((entity) => entity.kind !== 'category')
-      .slice(0, 10)
-      .map((entity) => ({ value: entity.label, label: entity.label, count: entity.count }));
-    return [{ value: 'all', label: 'Todas', count: visibleRecords.length }, ...entities];
-  }, [visibleEntities, visibleRecords.length]);
-
-  const tagOptions = useMemo(() => {
-    const counts = visibleRecords.flatMap((record) => record.tags).reduce<Record<string, number>>((accumulator, tag) => {
-      accumulator[tag] = (accumulator[tag] ?? 0) + 1;
-      return accumulator;
-    }, {});
-
-    return [
-      { value: 'all', label: 'Todas', count: visibleRecords.length },
-      ...Object.entries(counts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(([tag, count]) => ({ value: tag, label: tag, count })),
-    ];
-  }, [visibleRecords]);
-
-  function handleSurfaceChange(next: BrainSurface) {
-    setSurface(next);
-    if (isMobile) {
-      setMobileInspectorOpen(false);
-    }
-  }
-
-  function inspectRecord(id: string) {
-    setFocusedId(id);
-    setInspectedId(id);
-    if (isMobile) {
-      setMobileInspectorOpen(true);
-    }
-  }
-
-  function closeInspector() {
-    if (isMobile) {
-      setMobileInspectorOpen(false);
-      return;
-    }
-    setInspectedId(null);
-  }
-
-  function clearFilters() {
+  const clearFilters = () => {
     setFilters(DEFAULT_FILTERS);
+  };
+
+  const selectRecord = (id: string) => {
+    setSelectedId(id);
+  };
+
+  const openReader = () => setReaderOpen(true);
+  const closeReader = () => setReaderOpen(false);
+  const openFilters = () => setFiltersOpen(true);
+  const closeFilters = () => setFiltersOpen(false);
+
+  if (status === 'loading') {
+    return <LoadingState />;
   }
 
-  function setCategory(category: string) {
-    setFilters((previous) => ({
-      ...previous,
-      category: previous.category === category ? 'all' : (category as MemoryCategory | 'all'),
-    }));
-  }
-
-  function setImportance(importance: string) {
-    setFilters((previous) => ({
-      ...previous,
-      importance: previous.importance === importance ? 'all' : (importance as MemoryFilters['importance']),
-    }));
-  }
-
-  function setSource(source: string) {
-    setFilters((previous) => ({
-      ...previous,
-      source: previous.source === source ? 'all' : source,
-    }));
-  }
-
-  function setPeriod(period: string) {
-    setFilters((previous) => ({
-      ...previous,
-      period: previous.period === period ? 'all' : (period as PeriodFilter),
-    }));
-  }
-
-  function setEntity(entity: string) {
-    setFilters((previous) => ({
-      ...previous,
-      entity: previous.entity === entity ? 'all' : entity,
-    }));
-  }
-
-  function setTag(tag: string) {
-    setFilters((previous) => ({
-      ...previous,
-      tag: previous.tag === tag ? 'all' : tag,
-    }));
-  }
-
-  function setQuery(query: string) {
-    setFilters((previous) => ({ ...previous, query }));
-  }
-
-  const mainContent = (() => {
-    if (loadState === 'loading') {
-      return (
-        <EmptyState
-          eyebrow="Carregando"
-          title="Abrindo o snapshot"
-          description="O visor está lendo o export do Holographic e montando Brain, Diary e Inspector."
-        />
-      );
-    }
-
-    if (loadState === 'error') {
-      return (
-        <EmptyState
-          eyebrow="Erro"
-          title="Não foi possível carregar o acervo"
-          description={errorMessage || 'O snapshot não respondeu. Tente novamente em instantes.'}
-        />
-      );
-    }
-
-    if (surface === 'brain') {
-      return (
-        <BrainView
-          records={visibleRecords}
-          entities={visibleEntities}
-          relations={visibleRelations}
-          stats={{
-            total: visibleRecords.length,
-            relationCount: visibleRelations.length,
-            entityCount: visibleEntities.length,
-            categories: {},
-            sources: {},
-            importance: { low: 0, medium: 0, high: 0, anchor: 0 },
-          }}
-          activeId={focusRecord?.id ?? null}
-          onSelectRecord={inspectRecord}
-          onPickCategory={(value) => setCategory(value)}
-          onPickEntity={(value) => setEntity(value)}
-          onPickTag={(value) => setTag(value)}
-        />
-      );
-    }
-
+  if (status === 'error') {
     return (
-      <DiaryView
-        entries={visibleDiaryEntries}
-        records={visibleRecords}
-        activeId={focusRecord?.id ?? null}
-        onSelectRecord={inspectRecord}
-        onPickCategory={(value) => setCategory(value)}
-        onPickTag={(value) => setTag(value)}
-        onPickEntity={(value) => setEntity(value)}
+      <ErrorState
+        title="Não foi possível carregar o acervo"
+        description={errorMessage || 'O snapshot não respondeu. Tente novamente em instantes.'}
+        onRetry={() => setReloadTick((value) => value + 1)}
       />
     );
-  })();
+  }
 
-  const desktopInspectorRecord = !isMobile ? inspectedRecord : null;
-  const mobileInspectorVisible = isMobile && mobileInspectorOpen && Boolean(inspectedRecord);
-  const mobileInspectorRecord = mobileInspectorVisible ? inspectedRecord : null;
-
-  return isMobile ? (
-    <div className="app-shell app-shell--mobile">
-      <TopBar
-        mobile
-        surface={surface}
-        onSurfaceChange={handleSurfaceChange}
-        query={filters.query}
-        onQueryChange={setQuery}
-        syncLabel={syncState.label}
-        syncTone={syncState.tone}
-        totalCount={totalCount}
-        visibleCount={visibleCount}
-        selectedTitle={selectedTitle}
-        activeFilterCount={activeFilterCount}
-        onOpenFilters={() => setFiltersOpen(true)}
-        showSwitcher
-      />
-
-      <main className="app-shell__main app-shell__main--mobile" aria-label="Área principal">
-        {mainContent}
-      </main>
-
-      <MobileBottomNav surface={surface} onSurfaceChange={handleSurfaceChange} />
-
-      <FilterDrawer
-        open={filtersOpen}
-        mobile
-        filters={filters}
-        categoryOptions={categoryOptions}
-        importanceOptions={importanceOptions}
-        sourceOptions={sourceOptions}
-        periodOptions={periodOptions}
-        entityOptions={entityOptions}
-        tagOptions={tagOptions}
-        onChange={(patch) => setFilters((previous) => ({ ...previous, ...patch }))}
-        onClear={clearFilters}
-        onClose={() => setFiltersOpen(false)}
-      />
-
-      <InspectorPanel
-        record={mobileInspectorRecord}
-        records={visibleRecords}
-        relations={visibleRelations}
-        open={mobileInspectorVisible}
-        mobile
-        onClose={closeInspector}
-        onSelectRecord={inspectRecord}
-        onPickTag={setTag}
-        onPickEntity={setEntity}
-      />
-    </div>
-  ) : (
-    <div className={`app-shell app-shell--desktop ${desktopInspectorRecord ? 'has-inspector' : ''}`}>
-      <ShellSidebar
-        surface={surface}
-        onSurfaceChange={handleSurfaceChange}
-        syncLabel={syncState.label}
-        totalCount={totalCount}
-        visibleCount={visibleCount}
-        relationCount={visibleRelations.length}
-        selectedTitle={selectedTitle}
-      />
-
-      <div className="app-shell__workspace">
-        <TopBar
-          mobile={false}
-          surface={surface}
-          onSurfaceChange={handleSurfaceChange}
-          query={filters.query}
-          onQueryChange={setQuery}
-          syncLabel={syncState.label}
-          syncTone={syncState.tone}
-          totalCount={totalCount}
-          visibleCount={visibleCount}
-          selectedTitle={selectedTitle}
-          activeFilterCount={activeFilterCount}
-          onOpenFilters={() => setFiltersOpen(true)}
-          showSwitcher={false}
-        />
-
-        <FilterToolbar activeLabels={activeFilterLabelsList} onOpenFilters={() => setFiltersOpen(true)} onClear={clearFilters} />
-
-        <main className="workspace-stage" aria-label="Área principal">
-          {mainContent}
-        </main>
-      </div>
-
-      <FilterDrawer
-        open={filtersOpen}
-        mobile={false}
-        filters={filters}
-        categoryOptions={categoryOptions}
-        importanceOptions={importanceOptions}
-        sourceOptions={sourceOptions}
-        periodOptions={periodOptions}
-        entityOptions={entityOptions}
-        tagOptions={tagOptions}
-        onChange={(patch) => setFilters((previous) => ({ ...previous, ...patch }))}
-        onClear={clearFilters}
-        onClose={() => setFiltersOpen(false)}
-      />
-
-      {desktopInspectorRecord ? (
-        <InspectorPanel
-          record={desktopInspectorRecord}
-          records={visibleRecords}
-          relations={visibleRelations}
-          open={Boolean(desktopInspectorRecord)}
-          mobile={false}
-          onClose={closeInspector}
-          onSelectRecord={inspectRecord}
-          onPickTag={setTag}
-          onPickEntity={setEntity}
-        />
-      ) : null}
-    </div>
+  return (
+    <AppShell
+      mobile={!desktop}
+      surface={surface}
+      onSurfaceChange={setSurface}
+      syncLabel={syncLabel}
+      syncTone={syncTone}
+      totalCount={totalCount}
+      visibleCount={visibleCount}
+      relationCount={relationCount}
+      activeFilterSummary={activeFilterSummary}
+      activeFilterCount={activeFilterCount}
+      filters={filters}
+      facetGroups={facetGroups}
+      records={visibleRecords}
+      diaryGroups={diaryGroups}
+      selectedRecord={selectedRecord}
+      relatedRecords={relatedRecords}
+      onSelectRecord={selectRecord}
+      onQueryChange={(value) => patchFilters({ query: value })}
+      onToggleFilter={toggleFilter}
+      onPatchFilters={patchFilters}
+      onClearFilters={clearFilters}
+      onOpenFilters={openFilters}
+      onCloseFilters={closeFilters}
+      onOpenReader={openReader}
+      onCloseReader={closeReader}
+      readerOpen={readerOpen}
+      filtersOpen={filtersOpen}
+    />
   );
 }
 

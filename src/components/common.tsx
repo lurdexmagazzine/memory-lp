@@ -1,62 +1,40 @@
 import type { ReactNode } from 'react';
 
-function joinClassNames(...values: Array<string | false | null | undefined>): string {
+export type PillTone = 'neutral' | 'good' | 'warning' | 'danger' | 'accent';
+
+export function cx(...values: Array<string | false | null | undefined>): string {
   return values.filter(Boolean).join(' ');
 }
 
-export function SectionHeader({
-  eyebrow,
+export function StatusPill({ label, tone = 'neutral' }: { label: string; tone?: PillTone }) {
+  return <span className={cx('token-pill', `token-pill--${tone}`)}>{label}</span>;
+}
+
+export function ChipButton({
+  label,
+  active = false,
+  onClick,
   title,
-  description,
-  action,
-  className,
-}: {
-  eyebrow?: string;
-  title: string;
-  description?: string;
-  action?: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={joinClassNames('section-header', className)}>
-      <div className="section-header__copy">
-        {eyebrow ? <p className="section-header__eyebrow">{eyebrow}</p> : null}
-        <h2 className="section-header__title">{title}</h2>
-        {description ? <p className="section-header__description">{description}</p> : null}
-      </div>
-      {action ? <div className="section-header__action">{action}</div> : null}
-    </div>
-  );
-}
-
-export function MetricTile({
-  label,
-  value,
-  note,
-  tone = 'default',
+  disabled = false,
 }: {
   label: string;
-  value: string | number;
-  note?: string;
-  tone?: 'default' | 'accent' | 'calm';
+  active?: boolean;
+  onClick: () => void;
+  title?: string;
+  disabled?: boolean;
 }) {
   return (
-    <article className={joinClassNames('metric-tile', `metric-tile--${tone}`)}>
-      <span className="metric-tile__label">{label}</span>
-      <strong className="metric-tile__value">{value}</strong>
-      {note ? <span className="metric-tile__note">{note}</span> : null}
-    </article>
+    <button
+      type="button"
+      className={cx('chip-button', active && 'is-active')}
+      aria-pressed={active}
+      onClick={onClick}
+      title={title}
+      disabled={disabled}
+    >
+      {label}
+    </button>
   );
-}
-
-export function StatusPill({
-  label,
-  tone = 'neutral',
-}: {
-  label: string;
-  tone?: 'neutral' | 'good' | 'warning' | 'danger' | 'accent';
-}) {
-  return <span className={joinClassNames('status-pill', `status-pill--${tone}`)}>{label}</span>;
 }
 
 export function EmptyState({
@@ -80,36 +58,37 @@ export function EmptyState({
   );
 }
 
-export function ChipButton({
-  active,
-  label,
-  onClick,
-  title,
-}: {
-  active?: boolean;
-  label: string;
-  title?: string;
-  onClick: () => void;
-}) {
+export function LoadingState({ label = 'Abrindo o acervo…' }: { label?: string }) {
   return (
-    <button
-      type="button"
-      className={joinClassNames('chip-button', active && 'is-active')}
-      aria-pressed={Boolean(active)}
-      onClick={onClick}
-      title={title}
-    >
-      {label}
-    </button>
+    <section className="empty-state empty-state--loading" aria-busy="true" aria-live="polite">
+      <p className="empty-state__eyebrow">Carregando</p>
+      <h3 className="empty-state__title">{label}</h3>
+      <p className="empty-state__description">Lendo o snapshot, normalizando os dados e montando lista, timeline e reader.</p>
+    </section>
   );
 }
 
-export function TextBlock({ paragraphs }: { paragraphs: string[] }) {
+export function ErrorState({
+  title = 'Não foi possível carregar as memórias',
+  description = 'O snapshot não respondeu. Tente novamente em instantes.',
+  onRetry,
+}: {
+  title?: string;
+  description?: string;
+  onRetry?: () => void;
+}) {
   return (
-    <div className="text-block">
-      {paragraphs.map((paragraph, index) => (
-        <p key={`${index}-${paragraph.slice(0, 24)}`}>{paragraph}</p>
-      ))}
-    </div>
+    <section className="empty-state empty-state--error" role="alert">
+      <p className="empty-state__eyebrow">Erro</p>
+      <h3 className="empty-state__title">{title}</h3>
+      <p className="empty-state__description">{description}</p>
+      {onRetry ? (
+        <div className="empty-state__action">
+          <button type="button" className="ui-button" onClick={onRetry}>
+            Tentar novamente
+          </button>
+        </div>
+      ) : null}
+    </section>
   );
 }
