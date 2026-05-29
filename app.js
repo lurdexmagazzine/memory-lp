@@ -1,22 +1,13 @@
 const MOBILE_QUERY = window.matchMedia('(max-width: 979px)');
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
-const CATEGORY_ORDER = [
-  'all',
-  'brand',
-  'voice',
-  'workflow',
-  'product',
-  'project',
-  'platform',
-  'memory',
-];
+const CATEGORY_ORDER = ['all', 'brand', 'voice', 'workflow', 'product', 'project', 'platform', 'memory'];
 
 const CATEGORY_LABELS = {
-  all: 'Todas',
+  all: 'Tudo',
   brand: 'Marca',
   voice: 'Voz',
-  workflow: 'Rotina',
+  workflow: 'Fluxo',
   product: 'Produto',
   project: 'Projeto',
   platform: 'Plataforma',
@@ -31,6 +22,7 @@ const state = {
   signature: '',
   refreshing: false,
   lastSyncedAt: null,
+  lastFocusId: null,
 };
 
 const els = {
@@ -99,7 +91,7 @@ function formatSyncStatus(value) {
   return value ? `atualizado às ${formatTime(value)}` : 'atualizando…';
 }
 
-function excerpt(text, limit = 140) {
+function excerpt(text, limit = 150) {
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
   if (!clean) return '';
   if (clean.length <= limit) return clean;
@@ -166,10 +158,10 @@ function buildFilters(list) {
 function renderList(list) {
   if (!list.length) {
     els.list.innerHTML = `
-      <div class="detail-placeholder">
-        <p class="detail-placeholder__eyebrow">Nada por aqui</p>
-        <h2>Nenhuma memória neste recorte</h2>
-        <p>Ajuste a busca ou os filtros. O acervo continua inteiro, só saiu de cena por enquanto.</p>
+      <div class="reader-placeholder">
+        <p class="reader-placeholder__eyebrow">Nada por aqui</p>
+        <h2>Nenhuma memória nesta seleção</h2>
+        <p>Ajuste a busca ou os filtros. O acervo continua inteiro, só saiu deste recorte.</p>
       </div>
     `;
     return;
@@ -177,26 +169,15 @@ function renderList(list) {
 
   els.list.innerHTML = list
     .map((memory) => {
-      const tags = parseTags(memory.tags);
       const active = memory.id === state.activeId ? 'is-active' : '';
-      const handle = MOBILE_QUERY.matches ? 'Abrir' : 'Abrir leitura';
 
       return `
         <button class="memory-card ${active}" type="button" data-id="${escapeHTML(memory.id)}" aria-pressed="${memory.id === state.activeId ? 'true' : 'false'}">
-          <div class="memory-card__head">
-            <div class="memory-card__title-group">
-              <p class="memory-card__eyebrow">${escapeHTML(getCategoryLabel(memory.category))} · ${escapeHTML(formatDate(memory.created_at))}</p>
-              <h3>${escapeHTML(memoryTitle(memory))}</h3>
-            </div>
-            <span class="memory-card__chevron">${escapeHTML(handle)}</span>
-          </div>
-
+          <p class="memory-card__meta">${escapeHTML(getCategoryLabel(memory.category))} · ${escapeHTML(formatDate(memory.created_at))}</p>
+          <h3>${escapeHTML(memoryTitle(memory))}</h3>
           <p class="memory-card__summary">${escapeHTML(excerpt(memory.content))}</p>
-
           <div class="memory-card__footer">
-            <div class="tag-row">
-              ${tags.slice(0, 3).map((tag) => `<span class="tag-pill">${escapeHTML(tag)}</span>`).join('')}
-            </div>
+            <span class="memory-card__action">Ler</span>
           </div>
         </button>
       `;
@@ -207,6 +188,13 @@ function renderList(list) {
 function closeDetailSheet() {
   document.body.classList.remove('is-detail-open');
   els.backdrop.hidden = true;
+  els.detail.setAttribute('aria-modal', 'false');
+
+  window.requestAnimationFrame(() => {
+    const selector = state.activeId ? `[data-id="${state.activeId.replaceAll('"', '\\"')}"]` : null;
+    const card = selector ? document.querySelector(selector) : null;
+    card?.focus({ preventScroll: true });
+  });
 }
 
 function openDetailSheet() {
@@ -214,53 +202,54 @@ function openDetailSheet() {
 
   document.body.classList.add('is-detail-open');
   els.backdrop.hidden = false;
-  requestAnimationFrame(() => {
+  els.detail.setAttribute('aria-modal', 'true');
+
+  window.requestAnimationFrame(() => {
     els.detail.scrollTop = 0;
+    const closeButton = els.detail.querySelector('[data-close-detail]');
+    closeButton?.focus({ preventScroll: true });
   });
 }
 
 function renderDetail(memory) {
   if (!memory) {
     els.detail.innerHTML = `
-      <div class="detail-placeholder">
-        <p class="detail-placeholder__eyebrow">Leitura</p>
+      <div class="reader-placeholder">
+        <p class="reader-placeholder__eyebrow">Leitura</p>
         <h2>Escolha uma memória</h2>
-        <p>Selecione um cartão para ver o texto completo aqui.</p>
+        <p>O texto completo aparece aqui.</p>
       </div>
     `;
     return;
   }
 
   const tags = parseTags(memory.tags);
+  const titleId = `reader-title-${memory.id}`;
 
   els.detail.innerHTML = `
-    <article class="detail">
-      <div class="detail__stack">
-        <div class="detail__panel detail__panel--hero">
-          <div class="detail__mobilebar">
-            <span class="detail__handle" aria-hidden="true"></span>
-            <button class="detail__close" type="button" data-close-detail>Fechar</button>
-          </div>
-          <p class="detail__eyebrow">${escapeHTML(getCategoryLabel(memory.category))} · ${escapeHTML(formatDate(memory.created_at))}</p>
-          <h2>${escapeHTML(memoryTitle(memory))}</h2>
-          <p class="detail__lede">Texto original, sem edição.</p>
+    <article class="reader" aria-labelledby="${escapeHTML(titleId)}">
+      <div class="reader__section reader__header">
+        <div class="reader__mobilebar">
+          <span class="reader__handle" aria-hidden="true"></span>
+          <button class="reader__close" type="button" data-close-detail>Fechar</button>
         </div>
-
-        <div class="detail__panel detail__panel--body">
-          <div class="detail__body">
-            ${renderParagraphs(memory.content)}
-          </div>
-        </div>
-
-        <div class="detail__panel detail__panel--tags">
-          <div class="detail__label">Assuntos</div>
-          <div class="tag-row">
-            ${tags.map((tag) => `<span class="tag-pill">${escapeHTML(tag)}</span>`).join('')}
-          </div>
-        </div>
-
-        <p class="detail__note">Atualizado automaticamente.</p>
+        <p class="reader__eyebrow">${escapeHTML(getCategoryLabel(memory.category))} · ${escapeHTML(formatDate(memory.created_at))}</p>
+        <h2 class="reader__title" id="${escapeHTML(titleId)}">${escapeHTML(memoryTitle(memory))}</h2>
+        <p class="reader__lede">Texto preservado na íntegra.</p>
       </div>
+
+      <div class="reader__body">
+        ${renderParagraphs(memory.content)}
+      </div>
+
+      <div class="reader__footer">
+        <div class="reader__label">Assuntos</div>
+        <div class="tag-row">
+          ${tags.map((tag) => `<span class="tag-pill">${escapeHTML(tag)}</span>`).join('')}
+        </div>
+      </div>
+
+      <p class="reader__note">Atualizado automaticamente.</p>
     </article>
   `;
 }
@@ -286,6 +275,7 @@ function renderApp() {
 }
 
 function selectMemory(id) {
+  state.lastFocusId = id;
   state.activeId = id;
   renderApp();
   openDetailSheet();
@@ -343,17 +333,17 @@ async function refreshMemories({ silent = true } = {}) {
 
     if (!state.memories.length) {
       els.list.innerHTML = `
-        <div class="detail-placeholder">
-          <p class="detail-placeholder__eyebrow">Falha ao carregar</p>
+        <div class="reader-placeholder">
+          <p class="reader-placeholder__eyebrow">Falha ao carregar</p>
           <h2>Não foi possível carregar as memórias</h2>
           <p>Tente recarregar em alguns instantes.</p>
         </div>
       `;
       els.detail.innerHTML = `
-        <div class="detail-placeholder">
-          <p class="detail-placeholder__eyebrow">Erro</p>
-          <h2>Não foi possível abrir</h2>
-          <p>Tente recarregar a página e abrir outra memória.</p>
+        <div class="reader-placeholder">
+          <p class="reader-placeholder__eyebrow">Erro</p>
+          <h2>Não foi possível exibir esta memória</h2>
+          <p>Tente recarregar a página e abrir outra vez.</p>
         </div>
       `;
     }
@@ -430,16 +420,16 @@ async function init() {
   } catch (error) {
     console.error(error);
     els.list.innerHTML = `
-      <div class="detail-placeholder">
-        <p class="detail-placeholder__eyebrow">Falha ao carregar</p>
+      <div class="reader-placeholder">
+        <p class="reader-placeholder__eyebrow">Falha ao carregar</p>
         <h2>Não foi possível carregar as memórias</h2>
         <p>Tente recarregar a página.</p>
       </div>
     `;
     els.detail.innerHTML = `
-      <div class="detail-placeholder">
-        <p class="detail-placeholder__eyebrow">Erro</p>
-        <h2>Não foi possível abrir</h2>
+      <div class="reader-placeholder">
+        <p class="reader-placeholder__eyebrow">Erro</p>
+        <h2>Não foi possível exibir esta memória</h2>
         <p>${escapeHTML(error.message)}</p>
       </div>
     `;
