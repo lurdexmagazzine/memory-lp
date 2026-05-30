@@ -172,59 +172,56 @@ function topLabels(entries: DiaryEntry[], pick: (entry: DiaryEntry) => string[],
 
 export function presentDiaryDayMood(group: DiaryGroup): string {
   const categories = topLabels(group.entries, (entry) => [CATEGORY_LABELS[entry.category]], 3);
-  if (!categories.length) return 'um dia de recolher e organizar';
-  if (categories.includes('Voz') || categories.includes('Marca')) return 'um dia de afinar voz e imagem';
-  if (categories.includes('Fluxo') || categories.includes('Projeto')) return 'um dia de arrumar fluxo e rotina';
-  return `um dia de ${categories.slice(0, 2).join(' e ').toLowerCase()}`;
+  if (!categories.length) return 'dia de recolher e organizar';
+  if (categories.includes('Voz') || categories.includes('Marca')) return 'dia de voz e imagem';
+  if (categories.includes('Fluxo') || categories.includes('Projeto')) return 'dia de fluxo e rotina';
+  return `dia de ${categories.slice(0, 2).join(' e ').toLowerCase()}`;
 }
 
 export function presentDiaryDaySummary(group: DiaryGroup, limit = 220): string {
   const categories = topLabels(group.entries, (entry) => [CATEGORY_LABELS[entry.category]], 2);
-  const entryCount = group.entries.length;
-  const opening = entryCount > 16 ? 'Hoje foi um dia cheio, daqueles em que a casa inteira vai se ajeitando por dentro.' : 'Hoje foi um dia mais calmo, com espaço para ouvir o que realmente importava.';
-  const categoryPhrase = categories.length ? `Os assuntos mais vivos passaram por ${joinNaturalList(categories)}.` : 'Os assuntos ficaram espalhados de um jeito discreto.';
-  const closing = 'No fim, a sensação foi de consolidar mais do que de colecionar. Isso já muda o peso do dia.';
+  const opening = group.entries.length > 16 ? 'Hoje foi um dia cheio.' : 'Hoje foi um dia mais calmo.';
+  const categoryPhrase = categories.length ? `A conversa passou por ${joinNaturalList(categories).toLowerCase()}.` : 'A conversa foi se abrindo aos poucos.';
+  const closing = 'O dia ficou mais simples, mais íntimo e com menos ruído.';
   return presentExcerpt([opening, categoryPhrase, closing].join(' '), limit);
 }
 
 export function presentDiaryDayReflection(group: DiaryGroup): string {
   const categories = topLabels(group.entries, (entry) => [CATEGORY_LABELS[entry.category]], 3);
   if (categories.includes('Voz') || categories.includes('Marca')) {
-    return 'O que ficou mais perto de mim foi o cuidado com a voz e a imagem, sem deixar a página virar relatório.';
+    return 'O mais perto de mim foi o cuidado com a voz e com a imagem.';
   }
   if (categories.includes('Fluxo') || categories.includes('Projeto')) {
-    return 'O que ficou mais perto de mim foi arrumar o fluxo e cortar o que só fazia barulho.';
+    return 'O mais perto de mim foi arrumar o fluxo e cortar o excesso.';
   }
-  return 'O que ficou mais perto de mim foi deixar tudo mais claro, mais íntimo e menos técnico.';
+  return 'O mais perto de mim foi deixar tudo mais claro e menos técnico.';
 }
 
 export function presentDiaryDayTomorrow(group: DiaryGroup): string {
   const categories = topLabels(group.entries, (entry) => [CATEGORY_LABELS[entry.category]], 2);
   if (categories.includes('Voz') || categories.includes('Marca')) {
-    return 'Amanhã eu continuo afinando voz, ritmo e paleta, sem pesar a mão.';
+    return 'Amanhã eu continuo afinando voz, ritmo e paleta.';
   }
   if (categories.includes('Fluxo') || categories.includes('Projeto')) {
-    return 'Amanhã eu continuo ajustando rotina e sequência, sem inflar o resto.';
+    return 'Amanhã eu continuo ajustando rotina e sequência.';
   }
-  return 'Amanhã eu sigo consolidando o que vale a pena guardar.';
+  return 'Amanhã eu sigo consolidando o que vale guardar.';
 }
 
 export function presentDiaryDayLead(group: DiaryGroup): string {
   const categories = topLabels(group.entries, (entry) => [CATEGORY_LABELS[entry.category]], 2);
-  const opening = group.entries.length > 16 ? 'Hoje foi um dia cheio.' : 'Hoje foi um dia mais calmo.';
+  const opening = group.entries.length > 16 ? 'Dia cheio.' : 'Dia mais calmo.';
   const middle = categories.length ? `A conversa passou por ${joinNaturalList(categories).toLowerCase()}.` : 'A conversa foi se abrindo aos poucos.';
   return `${opening} ${middle}`;
 }
 
 export function presentDiaryDayBody(group: DiaryGroup): string {
   const mood = presentDiaryDayMood(group);
-  const categories = topLabels(group.entries, (entry) => [CATEGORY_LABELS[entry.category]], 3);
-  const categoryPhrase = categories.length ? `Passei por ${joinNaturalList(categories).toLowerCase()}, o que deixou o dia com cara de ${mood}.` : `O dia ficou com cara de ${mood}.`;
-  return `Hoje eu fui deixando o dia mais íntimo e menos técnico. ${categoryPhrase} ${presentDiaryDayReflection(group)}`;
+  return `Hoje eu fui deixando o dia mais íntimo e menos técnico. O tom ficou de ${mood}. ${presentDiaryDayReflection(group)}`;
 }
 
 export function presentDiaryDayTail(group: DiaryGroup): string {
-  return `Eu fiquei com vontade de deixar esse dia mais íntimo e menos técnico. ${presentDiaryDayReflection(group)} ${presentDiaryDayTomorrow(group)}`;
+  return `${presentDiaryDayReflection(group)} ${presentDiaryDayTomorrow(group)}`;
 }
 
 export function presentDiaryDayBadge(group: DiaryGroup): string {
