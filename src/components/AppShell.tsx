@@ -11,7 +11,7 @@ import {
   formatTimeLabel,
   paragraphs,
 } from '../lib/memory';
-import { presentDiaryEntryExcerpt, presentDiaryEntryTitle, presentDiarySummary, presentDiaryTitle, presentExcerpt, presentLabel, presentShortTitle, presentTitle } from '../lib/presentation';
+import { presentDiaryDayBadge, presentDiaryDayBody, presentDiaryDayLead, presentDiaryDayMood, presentDiaryDayReflection, presentDiaryDaySummary, presentDiaryDaySubtitle, presentDiaryDayTail, presentDiaryDayTitle, presentDiaryDayTomorrow, presentDiaryEntryTitle, presentDiarySummary, presentDiaryTitle, presentExcerpt, presentLabel, presentShortTitle, presentSummary, presentTitle } from '../lib/presentation';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -162,7 +162,7 @@ function FragmentItem({
 }) {
   const tags = compactTags(entry.tags, 2);
   const displayTitle = surface === 'diary' ? presentDiaryEntryTitle(entry) : compact ? presentShortTitle(entry.title) : presentTitle(entry.title);
-  const displayExcerpt = surface === 'diary' ? presentDiaryEntryExcerpt(entry, 110) : presentExcerpt(entry.excerpt, 110);
+  const displayExcerpt = presentExcerpt(entry.excerpt, 110);
 
   if (compact) {
     return (
@@ -334,34 +334,72 @@ function ChapterGroup(
   compact: boolean;
   surface: AppSurface;
 }) {
+  const representative = group.entries[0] ?? null;
   const totalEntries = group.entries.length;
+  const active = group.entries.some((entry) => entry.memoryId === selectedId);
+  const topTags = Array.from(new Set(group.entries.flatMap((entry) => entry.tags))).slice(0, 3);
+  const topCategories = Array.from(new Set(group.entries.map((entry) => CATEGORY_LABELS[entry.category]))).slice(0, 3);
+  const displayTitle = presentDiaryDayTitle(group);
+  const displaySummary = presentDiaryDaySummary(group, compact ? 180 : 220);
+  const displaySubtitle = presentDiaryDaySubtitle(group);
+  const buttonId = representative?.memoryId ?? group.key;
 
   return (
     <section className={cn('space-y-3', compact && 'space-y-4')}>
       <header className={cn('flex items-end justify-between gap-3', compact && 'border-l border-[color:var(--mauve-soft)] pl-3')}>
         <div className="space-y-1">
-          <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Capítulo</p>
-          <h3 className="font-serif text-xl text-foreground md:text-[1.35rem]">{group.label}</h3>
+          <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Dia</p>
+          <h3 className="font-serif text-xl text-foreground md:text-[1.35rem]">{displayTitle}</h3>
+          <p className="text-sm leading-6 text-muted-foreground">{displaySubtitle}</p>
         </div>
         <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
           {totalEntries} {totalEntries === 1 ? 'fragmento' : 'fragmentos'}
         </Badge>
       </header>
 
-      <div className="space-y-3">
-        {group.entries.map((entry) => (
-          <FragmentItem
-            key={entry.id}
-            entry={entry}
-            compact={compact}
-            surface={surface}
-            active={entry.memoryId === selectedId}
-            onSelect={() => onSelectRecord(entry.memoryId)}
-            onPickTag={onPickTag}
-            onBeforeSelect={onBeforeSelectRecord}
-          />
-        ))}
-      </div>
+      <button
+        type="button"
+        data-memory-id={buttonId}
+        data-active={active ? 'true' : undefined}
+        className="group relative block w-full text-left outline-none"
+        onPointerDown={(event) => {
+          onBeforeSelectRecord(event.currentTarget);
+        }}
+        onClick={(event) => {
+          onBeforeSelectRecord(event.currentTarget);
+          if (representative) onSelectRecord(representative.memoryId);
+        }}
+        aria-current={active ? 'true' : undefined}
+        title={displayTitle}
+      >
+        <article
+          className={cn(
+            'daily-diary-card ml-3 border-l border-[color:var(--mauve-soft)] bg-transparent px-4 py-4 shadow-none transition-all',
+            active ? 'rounded-[1.35rem] border border-border/60 bg-[color:var(--surface)]/94 px-4 py-4 shadow-[0_10px_24px_rgba(28,24,18,0.08)]' : 'hover:bg-[color:var(--surface-strong)]/70',
+          )}
+        >
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-[0.72rem] text-muted-foreground">
+            <Badge variant="secondary" className="rounded-full px-2.5 py-0.5 text-[10px] tracking-[0.04em]">
+              {presentDiaryDayMood(group)}
+            </Badge>
+            <span aria-hidden="true">·</span>
+            <span>{group.label}</span>
+          </div>
+
+          <p className="text-[0.98rem] leading-7 text-foreground/88">{displaySummary}</p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="rounded-full px-2.5 py-0.5 text-[10px] tracking-[0.04em]">
+              {presentDiaryDayBadge(group)}
+            </Badge>
+            {topCategories.map((label) => (
+              <Badge key={`${group.key}-category-${label}`} variant="outline" className="rounded-full px-2.5 py-0.5 text-[10px] tracking-[0.04em] text-muted-foreground">
+                {label}
+              </Badge>
+            ))}
+          </div>
+        </article>
+      </button>
     </section>
   );
 }
@@ -607,20 +645,36 @@ function RelatedEchoItem({
 
 function ReadingDocument({
   record,
-  related,
+  dayGroup,
   pageLabel,
   onSelectRecord,
   compact = false,
 }: {
   record: MemoryEntry;
-  related: Array<{ record: MemoryEntry; relation: MemoryRelation }>;
+  dayGroup: DiaryGroup | null;
   pageLabel: string;
   onSelectRecord: (id: string) => void;
   compact?: boolean;
 }) {
-  const displayTitle = compact ? presentShortTitle(record.title) : presentTitle(record.title);
-  const showSummary = shouldShowReadingSummary(record);
-  const visibleRelated = compact ? related.slice(0, 2) : related;
+  const activeGroup = dayGroup;
+  const isDaily = Boolean(activeGroup);
+  const displayTitle = activeGroup ? presentDiaryDayTitle(activeGroup) : compact ? presentShortTitle(record.title) : presentTitle(record.title);
+  const displaySubtitle = activeGroup
+    ? presentDiaryDaySubtitle(activeGroup)
+    : shouldShowReadingSummary(record)
+      ? presentSummary(record.summary, compact ? 120 : 140)
+      : '';
+  const displayLead = activeGroup ? presentDiaryDayLead(activeGroup) : presentSummary(record.summary, compact ? 180 : 140);
+  const displayBody = activeGroup
+    ? presentDiaryDayBody(activeGroup)
+    : paragraphs(record.content).join(' ');
+  const displayReflection = activeGroup ? presentDiaryDayReflection(activeGroup) : '';
+  const displayTomorrow = activeGroup ? presentDiaryDayTomorrow(activeGroup) : '';
+  const displayTail = activeGroup ? presentDiaryDayTail(activeGroup) : '';
+  const topTags = activeGroup ? Array.from(new Set(activeGroup.entries.flatMap((entry) => entry.tags))).slice(0, 3) : record.tags.slice(0, 3);
+  const topCategories = activeGroup
+    ? Array.from(new Set(activeGroup.entries.map((entry) => CATEGORY_LABELS[entry.category]))).slice(0, 3)
+    : [CATEGORY_LABELS[record.category]];
 
   if (compact) {
     return (
@@ -641,204 +695,140 @@ function ReadingDocument({
 
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em]">
-                Data · {formatDateLabel(record.createdAtMs)}
+                {pageLabel}
               </Badge>
               <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
-                Origem · {sourceLabel(record.source)}
+                {isDaily ? 'Consolidação' : CATEGORY_LABELS[record.category]}
               </Badge>
               <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
-                Importância · {IMPORTANCE_LABELS[record.importance]}
+                {isDaily ? presentDiaryDayMood(activeGroup!) : IMPORTANCE_LABELS[record.importance]}
               </Badge>
             </div>
 
             <div className="space-y-2">
               <h2 className="font-serif text-[clamp(1.38rem,6vw,1.95rem)] leading-[1.08] text-foreground [overflow-wrap:anywhere]">
-                Diário do dia
+                {displayTitle}
               </h2>
-              <p className="max-w-prose text-sm leading-6 text-muted-foreground">Tema · {presentDiaryTitle(record)}</p>
+              <p className="max-w-prose text-sm leading-6 text-muted-foreground">{displaySubtitle}</p>
             </div>
           </header>
 
-          <section className="reading-section space-y-3">
+          <section className="reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface-strong)]/55 p-4">
             <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Resumo</p>
-            <div className="space-y-4 text-[0.96rem] leading-7 text-foreground/88">
-              <p>{presentDiarySummary(record, 260)}</p>
+            <div className="space-y-4 text-[0.98rem] leading-7 text-foreground/90">
+              <p>{displayLead}</p>
             </div>
           </section>
 
-          <Separator className="bg-border/70" />
-
           <section className="reading-section space-y-3">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Contexto</p>
-            <p className="text-[0.96rem] leading-7 text-foreground/88">
-              Hoje ficou guardado um fragmento de {CATEGORY_LABELS[record.category]} vindo de {sourceLabel(record.source)}. A entrada foi tratada como página de diário, não como nota solta.
-            </p>
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">O que ficou vivo</p>
+            <p className="text-[0.98rem] leading-7 text-foreground/90">{displayBody}</p>
           </section>
 
-          <section className="reading-section space-y-3">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">O que foi bom</p>
-            <p className="text-[0.96rem] leading-7 text-foreground/88">
-              {record.tags.length ? `As marcas próximas ficaram discretas e úteis: ${record.tags.slice(0, 2).join(' · ')}.` : 'O registro ficou limpo, fácil de voltar e sem excesso de ruído.'}
-            </p>
-          </section>
+          {isDaily ? (
+            <>
+              <section className="reading-section space-y-3">
+                <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">O que mais me puxou</p>
+                <p className="text-[0.98rem] leading-7 text-foreground/90">{displayReflection}</p>
+              </section>
 
-          <section className="reading-section space-y-3">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">O que foi ruim</p>
-            <p className="text-[0.96rem] leading-7 text-foreground/88">
-              Ainda sobra ruído quando o conteúdo chega cru demais, muito técnico ou em inglês.
-            </p>
-          </section>
+              <section className="reading-section space-y-3">
+                <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Amanhã</p>
+                <p className="text-[0.98rem] leading-7 text-foreground/90">{displayTomorrow}</p>
+              </section>
 
-          <section className="reading-section space-y-3">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">O que aprendi</p>
-            <p className="text-[0.96rem] leading-7 text-foreground/88">
-              Memória útil é memória viva: curta, clara e fácil de recuperar depois.
-            </p>
-          </section>
+              <section className="reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface-strong)]/55 p-4">
+                <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Marcas discretas</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {topCategories.map((label) => (
+                    <Badge key={`${record.id}-daily-category-${label}`} variant="secondary" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em]">
+                      {label}
+                    </Badge>
+                  ))}
+                </div>
+              </section>
 
-          <section className="reading-section space-y-3">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">O que posso melhorar amanhã</p>
-            <p className="text-[0.96rem] leading-7 text-foreground/88">
-              Condensar por dia, escrever em português BR e deixar a leitura mais parecida com um diário de verdade.
-            </p>
-          </section>
-
-          <section className="reading-section space-y-3">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Decisões</p>
-            <p className="text-[0.96rem] leading-7 text-foreground/88">
-              Vou tratar a consolidação diária como uma página em si e manter a escrita das 22h no horário do Brasil como referência.
-            </p>
-          </section>
-
-          <section className="reading-section space-y-3">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Próximos passos</p>
-            <p className="text-[0.96rem] leading-7 text-foreground/88">
-              Continuar ajustando o leitor para ficar mais editorial, mais calmo e com as cores da Lurdex.
-            </p>
-          </section>
-
-          <Separator className="bg-border/70" />
-
-          <section className="reading-section space-y-3">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Links relacionados</p>
-            {visibleRelated.length ? (
-              <div className="grid gap-3">
-                {visibleRelated.map(({ record: relatedRecord, relation }) => (
-                  <button
-                    key={relatedRecord.id}
-                    type="button"
-                    className="rounded-[1.25rem] border border-border/70 bg-[color:var(--surface)]/94 p-3 text-left shadow-sm transition hover:bg-[color:var(--surface-strong)]/80 hover:shadow-md"
-                    onClick={() => onSelectRecord(relatedRecord.id)}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <strong className="min-w-0 font-serif text-[0.98rem] leading-[1.12] text-foreground [overflow-wrap:anywhere]">{presentDiaryTitle(relatedRecord)}</strong>
-                      <Badge variant="outline" className="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                        {relationLabel(relation.kind)}
-                      </Badge>
-                    </div>
-                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-foreground/82">{presentDiarySummary(relatedRecord, 110)}</p>
-                    <p className="mt-2 text-[0.7rem] uppercase tracking-[0.14em] text-muted-foreground">
-                      {formatShortDateLabel(relatedRecord.createdAtMs)} · {CATEGORY_LABELS[relatedRecord.category]} · {sourceLabel(relatedRecord.source)}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="text-[0.96rem] leading-7 text-muted-foreground">Quando surgirem relações confiáveis, elas aparecem aqui como apoio à leitura.</p>
-            )}
-          </section>
+              <section className="reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface)]/70 p-4">
+                <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Fecho</p>
+                <p className="text-[0.98rem] leading-7 text-foreground/90">{displayTail}</p>
+              </section>
+            </>
+          ) : null}
         </div>
-
       </article>
     );
   }
 
   return (
     <Card className="mx-auto w-full max-w-4xl !gap-0 !py-0 overflow-hidden border-border/70 bg-[color:var(--surface)]/96 shadow-[0_18px_48px_rgba(28,24,18,0.08)]">
-      <CardHeader className="gap-3 border-b border-border/60 px-5 py-4 md:px-6">
+      <CardHeader className="gap-4 border-b border-border/60 px-5 py-5 md:px-6">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em]">
+            {isDaily ? 'Diário' : 'Leitura'}
+          </Badge>
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             {pageLabel}
           </Badge>
           <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-            {CATEGORY_LABELS[record.category]}
-          </Badge>
-          <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-            {sourceLabel(record.source)}
+            {isDaily ? 'Consolidação do dia' : CATEGORY_LABELS[record.category]}
           </Badge>
         </div>
-        <p className="text-sm leading-6 text-muted-foreground">Leitura íntima, sem ruído de dashboard ou lista corporativa.</p>
-        {showSummary ? <p className="text-sm leading-6 text-foreground/80">{presentDiarySummary(record, 140)}</p> : null}
+        <h2 className="max-w-4xl font-serif text-[clamp(1.65rem,2.2vw,2.4rem)] leading-[1.12] text-foreground [overflow-wrap:anywhere]" title={displayTitle}>
+          {displayTitle}
+        </h2>
+        <p className="max-w-4xl text-sm leading-7 text-muted-foreground">{displaySubtitle || (isDaily ? presentDiaryDayMood(activeGroup!) : sourceLabel(record.source))}</p>
       </CardHeader>
 
       <CardContent className="space-y-6 px-5 py-5 md:px-6">
-        <section className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Anotação</p>
-          <div className="space-y-4 text-[0.98rem] leading-8 text-foreground/88">
-            {paragraphs(record.content).map((paragraph, index) => (
-              <p key={`${record.id}-paragraph-${index}`}>{paragraph}</p>
-            ))}
-          </div>
+        <section className="space-y-3 rounded-[1.4rem] border border-border/60 bg-[color:var(--surface-strong)]/55 p-5">
+          <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Resumo</p>
+          <p className="text-[1rem] leading-8 text-foreground/90">{displayLead}</p>
         </section>
 
-        <Separator className="bg-border/70" />
-
         <section className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Marcas</p>
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em]">
-              Data · {formatDateLabel(record.createdAtMs)} · {formatTimeLabel(record.createdAtMs)}
-            </Badge>
-            <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-              Importância · {IMPORTANCE_LABELS[record.importance]}
-            </Badge>
-            {record.tags.length ? (
-              record.tags.map((tag) => (
-                <Badge key={`${record.id}-tag-${tag}`} variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em]">
-                  {tag}
-                </Badge>
-              ))
-            ) : (
-              <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                Sem tags
-              </Badge>
-            )}
-            {record.entities.length ? (
-              record.entities.map((entity) => (
-                <Badge key={`${record.id}-entity-${entity}`} variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em]">
-                  {entity}
-                </Badge>
-              ))
-            ) : null}
-          </div>
+          <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">O que ficou vivo</p>
+          <p className="text-[1rem] leading-8 text-foreground/88">{displayBody}</p>
         </section>
 
-        <Separator className="bg-border/70" />
+        {isDaily ? (
+          <>
+            <section className="space-y-3">
+              <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">O que mais me puxou</p>
+              <p className="text-[1rem] leading-8 text-foreground/88">{displayReflection}</p>
+            </section>
 
-        <section className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Ecos relacionados</p>
-          {related.length ? (
-            <div className="grid gap-3">
-              {related.map(({ record: relatedRecord, relation }) => (
-                <RelatedEchoItem key={relatedRecord.id} record={relatedRecord} relation={relation} onSelect={onSelectRecord} />
-              ))}
-            </div>
-          ) : (
-            <EmptyPanel
-              eyebrow="Ecos relacionados"
-              title="Sem ecos ainda"
-              description="Quando surgirem relações confiáveis, elas aparecem aqui como pequenos apoios à leitura."
-            />
-          )}
-        </section>
+            <section className="space-y-3">
+              <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Amanhã</p>
+              <p className="text-[1rem] leading-8 text-foreground/88">{displayTomorrow}</p>
+            </section>
+
+            <section className="space-y-3 rounded-[1.4rem] border border-border/60 bg-[color:var(--surface-strong)]/55 p-5">
+              <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Marcas discretas</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {topCategories.map((label) => (
+                  <Badge key={`${record.id}-desktop-category-${label}`} variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em]">
+                    {label}
+                  </Badge>
+                ))}
+              </div>
+            </section>
+
+            <section className="space-y-3 rounded-[1.4rem] border border-border/60 bg-[color:var(--surface)]/70 p-5">
+              <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Fecho</p>
+              <p className="text-[1rem] leading-8 text-foreground/88">{displayTail}</p>
+            </section>
+          </>
+        ) : null}
       </CardContent>
     </Card>
   );
 }
 
+
 function DesktopReadingPage(
 {
   record,
+  dayGroup,
   related,
   mobile,
   onBack,
@@ -850,6 +840,7 @@ function DesktopReadingPage(
   onNext,
 }: {
   record: MemoryEntry | null;
+  dayGroup: DiaryGroup | null;
   related: Array<{ record: MemoryEntry; relation: MemoryRelation }>;
   mobile: boolean;
   onBack: () => void;
@@ -862,9 +853,16 @@ function DesktopReadingPage(
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
+  const displayTitle = dayGroup ? presentDiaryDayTitle(dayGroup) : record ? presentTitle(record.title) : 'Selecione uma memória';
+  const displaySubtitle = dayGroup
+    ? presentDiaryDaySubtitle(dayGroup)
+    : record && shouldShowReadingSummary(record)
+      ? presentSummary(record.summary, 140)
+      : '';
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
-  }, [record?.id]);
+  }, [pageLabel]);
 
   if (!record) {
     return (
@@ -919,14 +917,19 @@ function DesktopReadingPage(
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em]">
-                Leitura
+                {dayGroup ? 'Diário' : 'Leitura'}
               </Badge>
               <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                 {pageLabel}
               </Badge>
+              <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                {dayGroup ? 'Consolidação do dia' : CATEGORY_LABELS[record.category]}
+              </Badge>
             </div>
-            <h2 className="max-w-4xl font-serif text-[clamp(1.65rem,2.2vw,2.4rem)] leading-[1.12] text-foreground [overflow-wrap:anywhere]" title={record.title}>{presentTitle(record.title)}</h2>
-            {shouldShowReadingSummary(record) ? <p className="max-w-4xl text-sm leading-7 text-muted-foreground">{record.summary}</p> : null}
+            <h2 className="max-w-4xl font-serif text-[clamp(1.65rem,2.2vw,2.4rem)] leading-[1.12] text-foreground [overflow-wrap:anywhere]" title={displayTitle}>
+              {displayTitle}
+            </h2>
+            <p className="max-w-4xl text-sm leading-7 text-muted-foreground">{displaySubtitle || (dayGroup ? presentDiaryDayMood(dayGroup) : sourceLabel(record.source))}</p>
           </div>
 
           {!mobile ? (
@@ -946,7 +949,7 @@ function DesktopReadingPage(
 
       <ScrollArea className="flex-1 min-h-0" viewportRef={scrollRef}>
         <div className="px-4 py-5 sm:px-5 lg:px-6">
-          <ReadingDocument record={record} related={related} pageLabel={pageLabel} onSelectRecord={onSelectRecord} />
+          <ReadingDocument record={record} dayGroup={dayGroup} pageLabel={pageLabel} onSelectRecord={onSelectRecord} />
         </div>
       </ScrollArea>
     </section>
@@ -956,6 +959,7 @@ function DesktopReadingPage(
 function MobileReadingOverlay({
   open,
   record,
+  dayGroup,
   related,
   pageLabel,
   hasPrevious,
@@ -967,6 +971,7 @@ function MobileReadingOverlay({
 }: {
   open: boolean;
   record: MemoryEntry | null;
+  dayGroup: DiaryGroup | null;
   related: Array<{ record: MemoryEntry; relation: MemoryRelation }>;
   pageLabel: string;
   hasPrevious: boolean;
@@ -1022,7 +1027,7 @@ function MobileReadingOverlay({
         <ScrollArea className="reading-pane__scroll flex-1 min-h-0">
           <div className="px-4 py-5 sm:px-5">
             {record ? (
-              <ReadingDocument record={record} related={related} pageLabel={pageLabel} onSelectRecord={onSelectRecord} compact />
+              <ReadingDocument record={record} dayGroup={dayGroup} pageLabel={pageLabel} onSelectRecord={onSelectRecord} compact />
             ) : (
               <EmptyPanel
                 eyebrow="Leitura"
@@ -1267,25 +1272,26 @@ function DiaryLayout({
   filtersOpen,
   onTimelineScroll,
 }: AppShellProps) {
-  const timelineEntries = useMemo(() => timelineGroups.flatMap((group) => group.entries), [timelineGroups]);
-  const selectedIndex = useMemo(
-    () => (selectedRecord ? timelineEntries.findIndex((entry) => entry.memoryId === selectedRecord.id) : -1),
-    [selectedRecord, timelineEntries],
-  );
-  const pageLabel = selectedIndex >= 0 ? `Página ${selectedIndex + 1} de ${timelineEntries.length}` : 'Página —';
   const selectedDayKey = selectedRecord?.createdAtMs ? new Date(selectedRecord.createdAtMs).toISOString().slice(0, 10) : null;
   const selectedDayGroup = useMemo(
     () => (selectedDayKey ? timelineGroups.find((group) => group.key === selectedDayKey) ?? null : null),
     [selectedDayKey, timelineGroups],
   );
+  const selectedDayIndex = useMemo(
+    () => (selectedDayGroup ? timelineGroups.findIndex((group) => group.key === selectedDayGroup.key) : -1),
+    [selectedDayGroup, timelineGroups],
+  );
+  const pageLabel = selectedDayIndex >= 0 ? `Dia ${selectedDayIndex + 1} de ${timelineGroups.length}` : 'Dia —';
   const mobilePageLabel = selectedDayGroup ? `${selectedDayGroup.label} · ${selectedDayGroup.entries.length} fragmentos` : pageLabel;
-  const previousEntry = selectedIndex > 0 ? timelineEntries[selectedIndex - 1] : null;
-  const nextEntry = selectedIndex >= 0 && selectedIndex < timelineEntries.length - 1 ? timelineEntries[selectedIndex + 1] : null;
+  const previousDayGroup = selectedDayIndex > 0 ? timelineGroups[selectedDayIndex - 1] : null;
+  const nextDayGroup = selectedDayIndex >= 0 && selectedDayIndex < timelineGroups.length - 1 ? timelineGroups[selectedDayIndex + 1] : null;
   const goPrevious = () => {
-    if (previousEntry) onSelectRecord(previousEntry.memoryId);
+    const target = previousDayGroup?.entries[0];
+    if (target) onSelectRecord(target.memoryId);
   };
   const goNext = () => {
-    if (nextEntry) onSelectRecord(nextEntry.memoryId);
+    const target = nextDayGroup?.entries[0];
+    if (target) onSelectRecord(target.memoryId);
   };
   const resultLabelText = `Fragmentos · ${visibleCount} de ${totalCount}`;
   const indexHidden = compact && mobileView === 'reading';
@@ -1320,13 +1326,14 @@ function DiaryLayout({
       {!compact ? (
         <DesktopReadingPage
           record={selectedRecord}
+          dayGroup={selectedDayGroup}
           related={relatedRecords}
           mobile={false}
           onBack={onBackToIndex}
           onSelectRecord={onSelectRecord}
           pageLabel={pageLabel}
-          hasPrevious={Boolean(previousEntry)}
-          hasNext={Boolean(nextEntry)}
+          hasPrevious={Boolean(previousDayGroup)}
+          hasNext={Boolean(nextDayGroup)}
           onPrevious={goPrevious}
           onNext={goNext}
         />
@@ -1335,10 +1342,11 @@ function DiaryLayout({
       <MobileReadingOverlay
         open={compact && mobileView === 'reading'}
         record={selectedRecord}
+        dayGroup={selectedDayGroup}
         related={relatedRecords}
         pageLabel={mobilePageLabel}
-        hasPrevious={Boolean(previousEntry)}
-        hasNext={Boolean(nextEntry)}
+        hasPrevious={Boolean(previousDayGroup)}
+        hasNext={Boolean(nextDayGroup)}
         onBack={onBackToIndex}
         onSelectRecord={onSelectRecord}
         onPrevious={goPrevious}
