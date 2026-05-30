@@ -675,6 +675,77 @@ function ReadingDocument({
   const topCategories = activeGroup
     ? Array.from(new Set(activeGroup.entries.map((entry) => CATEGORY_LABELS[entry.category]))).slice(0, 3)
     : [CATEGORY_LABELS[record.category]];
+  const useArticleView = compact && activeGroup?.entries.length === 1;
+
+  if (useArticleView) {
+    return (
+      <article className="reading-document--mobile mx-auto w-full max-w-3xl overflow-hidden rounded-[1.75rem] border border-border/70 bg-[color:var(--surface)]/96 shadow-[0_18px_48px_rgba(28,24,18,0.08)]">
+        <div className="space-y-5 px-4 py-4 sm:px-5">
+          <header className="space-y-4">
+            <div className="reading-pane__mobile-ornament" aria-hidden="true">
+              <span />
+              <span />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--mauve-soft)] bg-[color:var(--surface-strong)]/78 px-2.5 py-1 text-[0.68rem] uppercase tracking-[0.18em] text-muted-foreground shadow-[0_4px_12px_rgba(28,24,18,0.04)]">
+                Diário do dia
+              </span>
+              <span aria-hidden="true" className="h-px flex-1 rounded-full bg-[linear-gradient(90deg,rgba(124,112,143,0.2),rgba(111,89,68,0.06),transparent)]" />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em]">
+                {displayTitle}
+              </Badge>
+              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
+                {pageLabel}
+              </Badge>
+              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
+                {CATEGORY_LABELS[record.category]}
+              </Badge>
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="font-serif text-[clamp(1.38rem,6vw,1.95rem)] leading-[1.08] text-foreground [overflow-wrap:anywhere]">
+                {displayTitle}
+              </h2>
+              <p className="max-w-prose text-sm leading-6 text-muted-foreground">{presentSummary(record.summary, 220)}</p>
+            </div>
+          </header>
+
+          <section className="reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface-strong)]/55 p-4">
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Texto</p>
+            <div className="space-y-4 text-[0.98rem] leading-7 text-foreground/90">
+              {paragraphs(record.content).map((paragraph, index) => (
+                <p key={`${record.id}-article-${index}`}>{paragraph}</p>
+              ))}
+            </div>
+          </section>
+
+          <section className="reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface)]/70 p-4">
+            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Marcas</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em]">
+                Data · {formatDateLabel(record.createdAtMs)}
+              </Badge>
+              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
+                Importância · {IMPORTANCE_LABELS[record.importance]}
+              </Badge>
+              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
+                Origem · {sourceLabel(record.source)}
+              </Badge>
+              {topTags.map((tag) => (
+                <Badge key={`${record.id}-article-tag-${tag}`} variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          </section>
+        </div>
+      </article>
+    );
+  }
 
   if (compact) {
     return (

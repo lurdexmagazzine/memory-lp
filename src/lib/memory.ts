@@ -241,9 +241,10 @@ function pushIssue(issues: ValidationIssue[], issue: ValidationIssue): void {
   issues.push(issue);
 }
 
-function normalizeRawRecord(raw: RawMemoryRecord, index: number, issues: ValidationIssue[]): Omit<MemoryEntry, 'importance' | 'importanceScore' | 'relationCount' | 'summary' | 'searchText'> | null {
+function normalizeRawRecord(raw: RawMemoryRecord, index: number, issues: ValidationIssue[]): Omit<MemoryEntry, 'importance' | 'importanceScore' | 'relationCount' | 'summary' | 'searchText'> & { summary?: string } | null {
   const title = toText(raw.title);
   const content = toText(raw.content);
+  const summary = toText(raw.summary);
   const id = toText(raw.id) || (typeof raw.fact_id === 'number' ? `fact-${raw.fact_id}` : `memory-${index + 1}`);
   const category = normalizeCategory(raw.category);
   const tags = uniqueTextList(raw.tags, true).map(normalizeTag);
@@ -298,6 +299,7 @@ function normalizeRawRecord(raw: RawMemoryRecord, index: number, issues: Validat
     updatedAt: formatTimestamp(updatedAtMs),
     createdAtMs,
     updatedAtMs,
+    summary: summary || undefined,
   };
 }
 
@@ -607,7 +609,7 @@ export function buildMemoryDataset(raw: unknown, sourceKind: MemoryDataset['sour
 
   const baseRecords = sourceRecords
     .map((item, index) => (isRecord(item) ? normalizeRawRecord(item as RawMemoryRecord, index, issues) : null))
-    .filter((item): item is Omit<MemoryEntry, 'importance' | 'importanceScore' | 'relationCount' | 'summary' | 'searchText'> => Boolean(item));
+    .filter((item): item is Omit<MemoryEntry, 'importance' | 'importanceScore' | 'relationCount' | 'summary' | 'searchText'> & { summary?: string } => Boolean(item));
 
   const provisionalRecords: MemoryEntry[] = baseRecords.map((record) => ({
     ...record,
@@ -630,7 +632,7 @@ export function buildMemoryDataset(raw: unknown, sourceKind: MemoryDataset['sour
     const relationCount = relationCounts.get(record.id) ?? 0;
     const importanceScore = scoreImportance(record, relationCount);
     const importance = scoreToImportance(importanceScore);
-    const summary = excerpt(record.content, 180);
+    const summary = record.summary?.trim() || excerpt(record.content, 180);
     const { relationCount: _relationCount, searchText: _searchText, ...searchableRecord } = record;
     const searchText = makeSearchText({
       ...searchableRecord,
@@ -678,14 +680,89 @@ export function buildMemoryDataset(raw: unknown, sourceKind: MemoryDataset['sour
   };
 }
 
-export async function loadMemoryDataset(): Promise<MemoryDataset> {
-  const response = await fetch(`./data/memories.json?v=${Date.now()}`, { cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(`Falha ao carregar data/memories.json (${response.status})`);
+function parseMarkdownFrontmatter(markdown: string): { frontmatter: Record<string, string>; body: string } {
+  const normalized = markdown.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  if (!normalized.startsWith('---\n')) {
+    return { frontmatter: {}, body: normalized.trim() };
   }
 
-  const raw = (await response.json()) as unknown;
-  return buildMemoryDataset(raw, 'snapshot');
+  const lines = normalized.split('\n');
+  const frontmatterLines: string[] = [];
+  let cursor = 1;
+
+  while (cursor < lines.length) {
+    const line = lines[cursor];
+    if (line === '---') {
+      cursor += 1;
+      break;
+    }
+    frontmatterLines.push(line);
+    cursor += 1;
+  }
+
+  const frontmatter: Record<string, string> = {};
+  for (const line of frontmatterLines) {
+    const match = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (!match) continue;
+    frontmatter[match[1].toLowerCase()] = match[2].trim();
+  }
+
+  return {
+    frontmatter,
+    body: lines.slice(cursor).join('\n').trim(),
+  };
+}
+
+function parseMarkdownList(value: string | undefined): string[] {
+
+  if (!value) return [];
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseMarkdownNumber(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseMemoryMarkdown(markdown: string): RawMemoryRecord[] {
+  const { frontmatter, body } = parseMarkdownFrontmatter(markdown);
+  const title = frontmatter.title || 'Diário de hoje';
+  const createdAt = frontmatter.created_at || frontmatter.date || new Date().toISOString();
+  const updatedAt = frontmatter.updated_at || createdAt;
+  const summary = frontmatter.summary || excerpt(body, 220);
+
+  return [
+    {
+      id: frontmatter.id || `daily-${createdAt.slice(0, 10)}`,
+      fact_id: parseMarkdownNumber(frontmatter.fact_id),
+      title,
+      summary,
+      content: body,
+      category: frontmatter.category || 'memory',
+      tags: parseMarkdownList(frontmatter.tags),
+      trust: frontmatter.trust ? Number.parseFloat(frontmatter.trust) : 0.8,
+      retrieval_count: parseMarkdownNumber(frontmatter.retrieval_count) ?? 0,
+      helpful_count: parseMarkdownNumber(frontmatter.helpful_count) ?? 0,
+      created_at: createdAt,
+      updated_at: updatedAt,
+      entities: parseMarkdownList(frontmatter.entities),
+      source: frontmatter.source || 'holographic',
+    },
+  ];
+}
+
+export async function loadMemoryDataset(): Promise<MemoryDataset> {
+  const response = await fetch(`./data/memories.md?v=${Date.now()}`, { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(`Falha ao carregar data/memories.md (${response.status})`);
+  }
+
+  const raw = await response.text();
+  return buildMemoryDataset(parseMemoryMarkdown(raw), 'markdown');
 }
 
 export function matchesFilters(record: MemoryEntry, filters: MemoryFilters): boolean {

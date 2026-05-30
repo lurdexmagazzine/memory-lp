@@ -106,7 +106,7 @@ export interface MemoryDatasetStats {
 }
 
 export interface MemoryDataset {
-  sourceKind: 'snapshot' | 'fixture';
+  sourceKind: 'snapshot' | 'fixture' | 'markdown';
   loadedAt: string;
   records: MemoryEntry[];
   entities: Entity[];
