@@ -83,6 +83,19 @@ function looksEnglishText(value: string): boolean {
   return hits >= 3;
 }
 
+function hashValue(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function pickVariant(value: string, variants: string[]): string {
+  if (!variants.length) return '';
+  return variants[hashValue(value) % variants.length];
+}
+
 export function presentDiarySummary(record: Pick<MemoryEntry, 'title' | 'summary' | 'content' | 'category' | 'importance' | 'tags'>, limit = 120): string {
   const sourceText = [record.summary, record.content, record.title].join(' ');
   if (!looksEnglishText(sourceText)) {
@@ -93,11 +106,25 @@ export function presentDiarySummary(record: Pick<MemoryEntry, 'title' | 'summary
   const category = CATEGORY_LABELS[record.category] ?? normalizeWhitespace(record.category.replace(/_/g, ' '));
   const importance = IMPORTANCE_LABELS[record.importance] ?? normalizeWhitespace(record.importance.replace(/_/g, ' '));
   const tags = record.tags.slice(0, 2).join(' · ');
-  const parts = [
-    `Hoje ficou guardado um fragmento de ${category}.`,
-    `O tom foi ${importance}, e o diário pediu mais calma e menos ruído.`,
-    tags ? `Marcas próximas: ${tags}.` : 'Marcas próximas mantidas discretas.',
-  ];
+  const focus = pickVariant(record.title, [
+    'Hoje a página ganhou corpo com uma camada mais calma.',
+    'A leitura foi lapidada para soar mais humana e mais próxima.',
+    'O diário deixou o ruído de lado e respirou melhor.',
+    'A memória chegou crua, mas o texto a vestiu com mais cuidado.',
+  ]);
+  const mood = pickVariant(record.content || record.title, [
+    `O tom ficou ${importance}, com cuidado para não virar relatório.`,
+    `O ritmo ficou ${importance}, sem apertar a página.`,
+    `A presença ficou ${importance}, mas ainda leve o suficiente para caber num olhar.`,
+  ]);
+  const closing = tags
+    ? `Marcas próximas: ${tags}.`
+    : pickVariant(record.title + record.content, [
+        'Marcas próximas mantidas discretas.',
+        'Sem marcação extra, só a pista certa.',
+        'Poucos sinais, para não roubar o centro da cena.',
+      ]);
+  const parts = [focus, `Fragmento de ${category}.`, mood, closing];
   return presentExcerpt(parts.join(' '), limit);
 }
 
@@ -124,12 +151,20 @@ export function presentDiaryEntryExcerpt(entry: DiaryEntry, limit = 120): string
   const category = CATEGORY_LABELS[entry.category] ?? normalizeWhitespace(entry.category.replace(/_/g, ' '));
   const importance = IMPORTANCE_LABELS[entry.importance] ?? normalizeWhitespace(entry.importance.replace(/_/g, ' '));
   const tags = entry.tags.slice(0, 2).join(' · ');
-  const parts = [
-    `Hoje ficou guardado um fragmento de ${category}.`,
-    `A importância é ${importance}.`,
-    tags ? `Marcas próximas: ${tags}.` : 'Marcas próximas discretas.',
-  ];
-  return presentExcerpt(parts.join(' '), limit);
+  const opener = pickVariant(entry.id, [
+    'A página ficou mais macia e mais fácil de respirar.',
+    'A cena saiu do modo relatório e entrou no modo página.',
+    'O texto foi suavizado para parecer diário de verdade.',
+  ]);
+  const body = pickVariant(entry.title + entry.excerpt, [
+    `Hoje apareceu um fragmento de ${category}, em tom ${importance}.`,
+    `Ficou guardado um fragmento de ${category} com presença ${importance}.`,
+    `A nota de ${category} veio com a medida certa de ${importance}.`,
+  ]);
+  const tail = tags
+    ? `Marcas próximas: ${tags}.`
+    : 'Marcas próximas discretas, sem exceder o espaço da leitura.';
+  return presentExcerpt([opener, body, tail].join(' '), limit);
 }
 
 export function presentLabel(value: string): string {
