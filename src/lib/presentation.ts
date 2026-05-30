@@ -155,6 +155,57 @@ function joinNaturalList(items: string[]): string {
   return `${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`;
 }
 
+function normalizeMarkdownHeading(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export type MarkdownSection = {
+  title: string;
+  body: string;
+};
+
+export function extractMarkdownSections(markdown: string): MarkdownSection[] {
+  const sections: MarkdownSection[] = [];
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+  let currentTitle = '';
+  let currentBody: string[] = [];
+  let inSection = false;
+
+  const flush = () => {
+    if (!currentTitle) return;
+    sections.push({ title: currentTitle, body: currentBody.join('\n').trim() });
+    currentTitle = '';
+    currentBody = [];
+  };
+
+  for (const line of lines) {
+    const match = line.match(/^##\s+(.+?)\s*$/);
+    if (match) {
+      flush();
+      currentTitle = match[1].trim();
+      inSection = true;
+      continue;
+    }
+
+    if (!inSection) continue;
+    currentBody.push(line);
+  }
+
+  flush();
+  return sections;
+}
+
+export function getMarkdownSection(markdown: string, title: string): string {
+  const target = normalizeMarkdownHeading(title);
+  const section = extractMarkdownSections(markdown).find((item) => normalizeMarkdownHeading(item.title) === target);
+  return section?.body ?? '';
+}
+
 function countLabels(labels: string[]): Array<[string, number]> {
   const map = new Map<string, number>();
   for (const label of labels) {

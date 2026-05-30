@@ -236,6 +236,81 @@
     "source": "holographic"
   },
   {
+    "id": "fact-44",
+    "fact_id": 44,
+    "title": "For memory-lp diary entries, the user wants at minimum these exact sections visible in the reader: Resumo, O que foi bom, O que foi ruim, O que eu aprendi, O que eu acho que posso melhorar amanhã, Decisões, Próximos passos",
+    "content": "For memory-lp diary entries, the user wants at minimum these exact sections visible in the reader: Resumo, O que foi bom, O que foi ruim, O que eu aprendi, O que eu acho que posso melhorar amanhã, Decisões, Próximos passos.",
+    "category": "general",
+    "tags": [],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-05-30 00:59:15",
+    "updated_at": "2026-05-30 00:59:15",
+    "entities": [],
+    "source": "holographic"
+  },
+  {
+    "id": "fact-43",
+    "fact_id": 43,
+    "title": "memory-lp now loads diary content from data/memories",
+    "content": "memory-lp now loads diary content from data/memories.md (synced to public/data/memories.md) instead of memories.json; the sync script removes the legacy public JSON snapshot.",
+    "category": "project",
+    "tags": [
+      "memory-lp",
+      "markdown",
+      "data-source",
+      "sync"
+    ],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-05-30 00:51:41",
+    "updated_at": "2026-05-30 00:51:41",
+    "entities": [],
+    "source": "holographic"
+  },
+  {
+    "id": "fact-41",
+    "fact_id": 41,
+    "title": "Marcos wants diary outputs to be noticeably longer and richer when the day has material: more detail, more sense of what happened, less generic summary, and a stronger feeling that real work happened that day",
+    "content": "Marcos wants diary outputs to be noticeably longer and richer when the day has material: more detail, more sense of what happened, less generic summary, and a stronger feeling that real work happened that day.",
+    "category": "user_pref",
+    "tags": [
+      "diary",
+      "writing-style",
+      "detail",
+      "voice"
+    ],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-05-30 00:31:03",
+    "updated_at": "2026-05-30 00:31:03",
+    "entities": [],
+    "source": "holographic"
+  },
+  {
+    "id": "fact-40",
+    "fact_id": 40,
+    "title": "Marcos prefers the memory-lp diary to be consolidated as one daily note per day, with a human PT-BR voice, no related-echo blocks, and a mobile reader that does not truncate text",
+    "content": "Marcos prefers the memory-lp diary to be consolidated as one daily note per day, with a human PT-BR voice, no related-echo blocks, and a mobile reader that does not truncate text.",
+    "category": "user_pref",
+    "tags": [
+      "memory-lp",
+      "daily-diary",
+      "pt-br",
+      "mobile"
+    ],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-05-30 00:27:38",
+    "updated_at": "2026-05-30 00:27:38",
+    "entities": [],
+    "source": "holographic"
+  },
+  {
     "id": "fact-39",
     "fact_id": 39,
     "title": "Marcos wants memory-lp to read like a daily diary, with date, theme, context, summary, good/bad, learnings, decisions, and next steps; he also prefers screenshots delivered as media in chat",

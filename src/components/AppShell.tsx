@@ -11,7 +11,7 @@ import {
   formatTimeLabel,
   paragraphs,
 } from '../lib/memory';
-import { presentDiaryDayBadge, presentDiaryDayBody, presentDiaryDayLead, presentDiaryDayMood, presentDiaryDayReflection, presentDiaryDaySummary, presentDiaryDaySubtitle, presentDiaryDayTail, presentDiaryDayTitle, presentDiaryDayTomorrow, presentDiaryEntryTitle, presentDiarySummary, presentDiaryTitle, presentExcerpt, presentLabel, presentShortTitle, presentSummary, presentTitle } from '../lib/presentation';
+import { getMarkdownSection, presentDiaryDayBadge, presentDiaryDayBody, presentDiaryDayLead, presentDiaryDayMood, presentDiaryDayReflection, presentDiaryDaySummary, presentDiaryDaySubtitle, presentDiaryDayTail, presentDiaryDayTitle, presentDiaryDayTomorrow, presentDiaryEntryTitle, presentDiarySummary, presentDiaryTitle, presentExcerpt, presentLabel, presentShortTitle, presentSummary, presentTitle } from '../lib/presentation';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -677,6 +677,33 @@ function ReadingDocument({
     : [CATEGORY_LABELS[record.category]];
   const useArticleView = compact && activeGroup?.entries.length === 1;
 
+  const diarySectionEntries = isDaily
+    ? [
+        { title: 'Resumo', text: getMarkdownSection(record.content, 'Resumo') || displayLead },
+        { title: 'O que foi bom', text: getMarkdownSection(record.content, 'O que foi bom') || displayBody },
+        { title: 'O que foi ruim', text: getMarkdownSection(record.content, 'O que foi ruim') || displayReflection },
+        { title: 'O que eu aprendi', text: getMarkdownSection(record.content, 'O que eu aprendi') || displayTail },
+        { title: 'O que eu acho que posso melhorar amanhã', text: getMarkdownSection(record.content, 'O que eu acho que posso melhorar amanhã') || displayTomorrow },
+        { title: 'Decisões', text: getMarkdownSection(record.content, 'Decisões') || displayReflection },
+        { title: 'Próximos passos', text: getMarkdownSection(record.content, 'Próximos passos') || displayTomorrow },
+      ]
+    : [];
+
+  const renderDiarySections = (sectionClass: string, labelClass: string, textClass: string) => (
+    <>
+      {diarySectionEntries.map(({ title, text }) => (
+        <section key={title} className={sectionClass}>
+          <p className={labelClass}>{title}</p>
+          <div className={textClass}>
+            {paragraphs(text).map((paragraph, index) => (
+              <p key={`${record.id}-${title}-${index}`}>{paragraph}</p>
+            ))}
+          </div>
+        </section>
+      ))}
+    </>
+  );
+
   if (useArticleView) {
     return (
       <article className="reading-document--mobile mx-auto w-full max-w-3xl overflow-hidden rounded-[1.75rem] border border-border/70 bg-[color:var(--surface)]/96 shadow-[0_18px_48px_rgba(28,24,18,0.08)]">
@@ -714,34 +741,65 @@ function ReadingDocument({
             </div>
           </header>
 
-          <section className="reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface-strong)]/55 p-4">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Texto</p>
-            <div className="space-y-4 text-[0.98rem] leading-7 text-foreground/90">
-              {paragraphs(record.content).map((paragraph, index) => (
-                <p key={`${record.id}-article-${index}`}>{paragraph}</p>
-              ))}
-            </div>
-          </section>
+          {isDaily ? (
+            <>
+              {renderDiarySections(
+                'reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface-strong)]/55 p-4',
+                'text-[0.74rem] tracking-[0.08em] text-muted-foreground',
+                'space-y-4 text-[0.98rem] leading-7 text-foreground/90',
+              )}
+              <section className="reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface)]/70 p-4">
+                <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Marcas</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em]">
+                    Data · {formatDateLabel(record.createdAtMs)}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
+                    Importância · {IMPORTANCE_LABELS[record.importance]}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
+                    Origem · {sourceLabel(record.source)}
+                  </Badge>
+                  {topTags.map((tag) => (
+                    <Badge key={`${record.id}-article-tag-${tag}`} variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </section>
+            </>
+          ) : (
+            <>
+              <section className="reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface-strong)]/55 p-4">
+                <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Texto</p>
+                <div className="space-y-4 text-[0.98rem] leading-7 text-foreground/90">
+                  {paragraphs(record.content).map((paragraph, index) => (
+                    <p key={`${record.id}-article-${index}`}>{paragraph}</p>
+                  ))}
+                </div>
+              </section>
 
-          <section className="reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface)]/70 p-4">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Marcas</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em]">
-                Data · {formatDateLabel(record.createdAtMs)}
-              </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
-                Importância · {IMPORTANCE_LABELS[record.importance]}
-              </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
-                Origem · {sourceLabel(record.source)}
-              </Badge>
-              {topTags.map((tag) => (
-                <Badge key={`${record.id}-article-tag-${tag}`} variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          </section>
+              <section className="reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface)]/70 p-4">
+                <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Marcas</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em]">
+                    Data · {formatDateLabel(record.createdAtMs)}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
+                    Importância · {IMPORTANCE_LABELS[record.importance]}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
+                    Origem · {sourceLabel(record.source)}
+                  </Badge>
+                  {topTags.map((tag) => (
+                    <Badge key={`${record.id}-article-tag-${tag}`} variant="outline" className="rounded-full px-3 py-1 text-[10px] tracking-[0.04em] text-muted-foreground">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
         </div>
       </article>
     );
@@ -791,24 +849,15 @@ function ReadingDocument({
             </div>
           </section>
 
-          <section className="reading-section space-y-3">
-            <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">O que ficou vivo</p>
-            <p className="text-[0.98rem] leading-7 text-foreground/90">{displayBody}</p>
-          </section>
-
           {isDaily ? (
             <>
-              <section className="reading-section space-y-3">
-                <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">O que mais me puxou</p>
-                <p className="text-[0.98rem] leading-7 text-foreground/90">{displayReflection}</p>
-              </section>
+              {renderDiarySections(
+                'reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface-strong)]/55 p-4',
+                'text-[0.74rem] tracking-[0.08em] text-muted-foreground',
+                'space-y-4 text-[0.98rem] leading-7 text-foreground/90',
+              )}
 
-              <section className="reading-section space-y-3">
-                <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Amanhã</p>
-                <p className="text-[0.98rem] leading-7 text-foreground/90">{displayTomorrow}</p>
-              </section>
-
-              <section className="reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface-strong)]/55 p-4">
+              <section className="reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface)]/70 p-4">
                 <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Marcas discretas</p>
                 <div className="flex flex-wrap items-center gap-2">
                   {topCategories.map((label) => (
@@ -817,11 +866,6 @@ function ReadingDocument({
                     </Badge>
                   ))}
                 </div>
-              </section>
-
-              <section className="reading-section space-y-3 rounded-[1.35rem] border border-border/60 bg-[color:var(--surface)]/70 p-4">
-                <p className="text-[0.74rem] tracking-[0.08em] text-muted-foreground">Fecho</p>
-                <p className="text-[0.98rem] leading-7 text-foreground/90">{displayTail}</p>
               </section>
             </>
           ) : null}
@@ -851,27 +895,13 @@ function ReadingDocument({
       </CardHeader>
 
       <CardContent className="space-y-6 px-5 py-5 md:px-6">
-        <section className="space-y-3 rounded-[1.4rem] border border-border/60 bg-[color:var(--surface-strong)]/55 p-5">
-          <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Resumo</p>
-          <p className="text-[1rem] leading-8 text-foreground/90">{displayLead}</p>
-        </section>
-
-        <section className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">O que ficou vivo</p>
-          <p className="text-[1rem] leading-8 text-foreground/88">{displayBody}</p>
-        </section>
-
         {isDaily ? (
           <>
-            <section className="space-y-3">
-              <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">O que mais me puxou</p>
-              <p className="text-[1rem] leading-8 text-foreground/88">{displayReflection}</p>
-            </section>
-
-            <section className="space-y-3">
-              <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Amanhã</p>
-              <p className="text-[1rem] leading-8 text-foreground/88">{displayTomorrow}</p>
-            </section>
+            {renderDiarySections(
+              'space-y-3 rounded-[1.4rem] border border-border/60 bg-[color:var(--surface-strong)]/55 p-5',
+              'text-xs uppercase tracking-[0.26em] text-muted-foreground',
+              'space-y-4 text-[1rem] leading-8 text-foreground/88',
+            )}
 
             <section className="space-y-3 rounded-[1.4rem] border border-border/60 bg-[color:var(--surface-strong)]/55 p-5">
               <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Marcas discretas</p>
@@ -883,13 +913,20 @@ function ReadingDocument({
                 ))}
               </div>
             </section>
+          </>
+        ) : (
+          <>
+            <section className="space-y-3 rounded-[1.4rem] border border-border/60 bg-[color:var(--surface-strong)]/55 p-5">
+              <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Resumo</p>
+              <p className="text-[1rem] leading-8 text-foreground/90">{displayLead}</p>
+            </section>
 
-            <section className="space-y-3 rounded-[1.4rem] border border-border/60 bg-[color:var(--surface)]/70 p-5">
-              <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">Fecho</p>
-              <p className="text-[1rem] leading-8 text-foreground/88">{displayTail}</p>
+            <section className="space-y-3">
+              <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">O que ficou vivo</p>
+              <p className="text-[1rem] leading-8 text-foreground/88">{displayBody}</p>
             </section>
           </>
-        ) : null}
+        )}
       </CardContent>
     </Card>
   );
