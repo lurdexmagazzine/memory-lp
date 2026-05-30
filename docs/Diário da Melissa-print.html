@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Diário da Melissa — impressão</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Parisienne&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Hanken+Grotesk:wght@400;500;600;700&family=Caveat:wght@500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #3a2f3f; --ink-soft: #7a6e82; --faint: #a99fb0;
+      --lilac: #ad94d1; --lilac-deep: #7d5da8; --rose-deep: #c8729c; --magenta: #ac4d7e;
+      --line: #e9ddcb; --paper: #faf6ef;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      background: #ece4f0; color: var(--ink);
+      font-family: "Cormorant Garamond", Georgia, serif;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .doc {
+      max-width: 760px; margin: 26px auto; background: #fff;
+      padding: 52px 56px 44px; border-radius: 6px;
+      box-shadow: 0 24px 70px -28px rgba(65,53,74,.45);
+    }
+    .loading { text-align: center; color: var(--faint); font-family: "Hanken Grotesk", sans-serif; padding: 60px 0; }
+
+    .entry { position: relative; }
+    .entry + .entry { margin-top: 56px; padding-top: 4px; }
+
+    .ps-masthead { display: flex; justify-content: space-between; align-items: center; }
+    .ps-brand { font-family: "Hanken Grotesk", sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--lilac-deep); display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .ps-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--lilac); flex: 0 0 auto; }
+    .ps-when { font-family: "Hanken Grotesk", sans-serif; font-size: 10px; letter-spacing: .08em; color: var(--faint); text-transform: uppercase; white-space: nowrap; }
+    .ps-rule { height: 2px; background: linear-gradient(90deg, var(--rose-deep), var(--lilac) 55%, rgba(173,148,209,0) 100%); margin: 11px 0 30px; }
+
+    .ps-title { font-family: "Parisienne", cursive; font-size: 60px; font-weight: 400; line-height: 1.1; margin: 0 0 10px; color: #41354a; text-wrap: balance; }
+    .ps-context { font-style: italic; color: var(--lilac-deep); font-size: 14.5px; line-height: 1.5; margin: 0 0 24px; max-width: 46em; }
+
+    .ps-info { display: flex; flex-wrap: wrap; gap: 16px 36px; margin: 0 0 22px; padding: 15px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .ps-info > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .ps-info dt { font-family: "Hanken Grotesk", sans-serif; font-size: 8.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); margin: 0; }
+    .ps-info dd { margin: 0; font-family: "Hanken Grotesk", sans-serif; font-size: 12.5px; font-weight: 600; color: #41354a; }
+    .ps-info > div:not(:nth-child(2)) dd { white-space: nowrap; }
+
+    .ps-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 30px; }
+    .ps-tags span { font-family: "Hanken Grotesk", sans-serif; font-size: 9.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: #f1eafa; color: var(--lilac-deep); border: 1px solid #ddd0ee; white-space: nowrap; }
+    .ps-tags span:nth-child(even) { background: #fcf0f5; color: var(--rose-deep); border-color: #f6dde9; }
+
+    .ps-kicker { font-family: "Hanken Grotesk", sans-serif; font-size: 9px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--lilac-deep); margin-bottom: 9px; }
+    .ps-kicker.rose { color: var(--rose-deep); }
+
+    .ps-prose { font-size: 16.5px; line-height: 1.6; color: var(--ink); }
+    .ps-prose p { margin: 0 0 11px; }
+    .ps-prose p:last-child { margin-bottom: 0; }
+    .ps-resumo { margin-bottom: 8px; }
+
+    .ps-section { margin-top: 26px; break-inside: avoid; page-break-inside: avoid; }
+    .ps-h2 { font-family: "Cormorant Garamond", Georgia, serif; font-size: 27px; font-weight: 600; color: #41354a; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #ece1d0; display: flex; align-items: center; gap: 11px; }
+    .ps-bullet { width: 9px; height: 9px; border-radius: 2px; flex: 0 0 auto; }
+    .ps-list { list-style: none; margin: 0; padding: 0; }
+    .ps-list li { position: relative; padding-left: 19px; font-size: 15.5px; line-height: 1.45; margin-bottom: 9px; break-inside: avoid; }
+    .ps-list li:last-child { margin-bottom: 0; }
+    .ps-list li::before { content: ""; position: absolute; left: 2px; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: #c89bd0; }
+    .ps-prose code, .ps-list code { font-family: ui-monospace, monospace; background: #f1eafa; color: var(--lilac-deep); padding: 1px 5px; border-radius: 4px; font-size: .85em; }
+
+    .ps-anno { margin-top: 30px; padding: 17px 21px; background: #fcf0f5; border: 1px solid #f6dde9; border-radius: 12px; break-inside: avoid; }
+    .ps-anno p { margin: 0; font-family: "Caveat", cursive; font-size: 22px; line-height: 1.25; color: #41354a; }
+
+    .ps-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 34px; padding-top: 14px; border-top: 1px solid var(--line); font-family: "Hanken Grotesk", sans-serif; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+
+    @page { size: A4 portrait; margin: 15mm 15mm; }
+    @media print {
+      body { background: #fff; }
+      .doc { max-width: none; margin: 0; padding: 0; border-radius: 0; box-shadow: none; }
+      .entry { break-before: page; page-break-before: always; }
+      .entry:first-child { break-before: auto; page-break-before: auto; }
+      .entry + .entry { margin-top: 0; }
+      .ps-title { font-size: 44px; }
+      /* fluxo natural entre páginas, sem vãos nem títulos órfãos */
+      .ps-section { break-inside: auto; page-break-inside: auto; }
+      .ps-h2, .ps-kicker { break-after: avoid; page-break-after: avoid; }
+      .ps-prose p, .ps-list li { orphans: 2; widows: 2; }
+      .ps-list li, .ps-anno, .ps-foot { break-inside: avoid; page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="doc" id="doc"><div class="loading">Preparando o documento…</div></div>
+
+  <script src="markdown.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      var MD = window.DiarioMD;
+      var PS_TINT = {
+        resumo: "#7d5da8", bom: "#c8729c", ruim: "#ac4d7e", aprendi: "#9a7cc4",
+        melhorar: "#b083c9", decisoes: "#7d5da8", passos: "#c8729c", links: "#a99fb0", outro: "#ad94d1",
+      };
+      function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+      function moodFor(entry) {
+        var t = (entry.tema + " " + (entry.excerpt || "")).toLowerCase();
+        if (/intens|irrit|bronca|peso|velocidade|r\u00e1pid/.test(t)) return "Intenso";
+        if (/primeiro|come\u00e7|leve|ansios/.test(t)) return "Leve";
+        return "Calmo";
+      }
+      function renderEntry(e) {
+        var resumo = e.sections.find(function (s) { return s.kind === "resumo"; });
+        var rest = e.sections.filter(function (s) { return s.kind !== "resumo"; });
+        var html = '<article class="entry">';
+        html += '<header class="ps-masthead"><div class="ps-brand"><span class="ps-dot"></span>Di\u00e1rio da Melissa</div>'
+              + '<div class="ps-when">' + esc(MD.formatDatePt(e.date)) + ' \u00b7 22:00</div></header>';
+        html += '<div class="ps-rule"></div>';
+        html += '<h1 class="ps-title">' + esc(e.title) + '</h1>';
+        if (e.contexto) html += '<p class="ps-context">' + esc(e.contexto) + '</p>';
+        html += '<dl class="ps-info">'
+              + '<div><dt>Data</dt><dd>' + esc(MD.formatDateShort(e.date)) + '</dd></div>'
+              + '<div><dt>Tema</dt><dd>' + esc(e.tema || "\u2014") + '</dd></div>'
+              + '<div><dt>Humor</dt><dd>' + moodFor(e) + '</dd></div>'
+              + '<div><dt>Autora</dt><dd>Melissa</dd></div></dl>';
+        if (e.tags.length) {
+          html += '<div class="ps-tags">' + e.tags.map(function (t) { return "<span>" + esc(t) + "</span>"; }).join("") + '</div>';
+        }
+        if (resumo) html += '<div class="ps-resumo"><div class="ps-kicker">Resumo</div><div class="ps-prose">' + resumo.html + '</div></div>';
+        rest.forEach(function (s) {
+          var tint = PS_TINT[s.kind] || PS_TINT.outro;
+          html += '<section class="ps-section"><h2 class="ps-h2"><span class="ps-bullet" style="background:' + tint + '"></span>' + esc(s.title) + '</h2>';
+          if (s.type === "prose") html += '<div class="ps-prose">' + s.html + '</div>';
+          else html += '<ul class="ps-list">' + s.items.map(function (it) { return "<li>" + it.html + "</li>"; }).join("") + '</ul>';
+          html += '</section>';
+        });
+        if (e.annotation) html += '<div class="ps-anno"><div class="ps-kicker rose">Anota\u00e7\u00e3o</div><p>' + esc(e.annotation) + '</p></div>';
+        html += '<footer class="ps-foot"><span>Di\u00e1rio da Melissa</span><span>mem\u00f3ria persistente \u00b7 ' + esc(MD.formatDatePt(e.date)) + '</span></footer>';
+        html += '</article>';
+        return html;
+      }
+
+      function autoPrint() {
+        // não imprime se estiver embutido num iframe (pré-visualização)
+        var embedded = window.self !== window.top;
+        if (embedded || /[?&]preview/.test(location.search)) return;
+        var go = function () { setTimeout(function () { window.print(); }, 500); };
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(go); else go();
+      }
+
+      (function load() {
+        var doc = document.getElementById("doc");
+        var only = new URLSearchParams(location.search).get("entry");
+        fetch("entries/index.json").then(function (r) { return r.json(); }).then(function (idx) {
+          var files = idx.entries || [];
+          if (only) files = files.filter(function (f) { return f === only; });
+          return Promise.all(files.map(function (f) {
+            return fetch("entries/" + f).then(function (r) { return r.ok ? r.text() : null; })
+              .then(function (t) { return t ? MD.parseEntry(t, f) : null; }).catch(function () { return null; });
+          }));
+        }).then(function (parsed) {
+          var entries = parsed.filter(Boolean).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+          if (!entries.length) { doc.innerHTML = '<div class="loading">Nenhuma p\u00e1gina encontrada.</div>'; return; }
+          doc.innerHTML = entries.map(renderEntry).join("");
+          autoPrint();
+        }).catch(function (err) {
+          doc.innerHTML = '<div class="loading">N\u00e3o consegui carregar as p\u00e1ginas (' + esc(err.message || err) + ').</div>';
+        });
+      })();
+    })();
+  </script>
+</body>
+</html>

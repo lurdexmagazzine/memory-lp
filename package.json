@@ -5,11 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "sync:data": "python3 scripts/sync_public_data.py",
-    "build": "npm run sync:data && vite build",
-    "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run build",
-    "preview": "vite preview"
+    "build": "python3 build.py",
+    "preview": "python3 -m http.server 4173 --directory docs"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
