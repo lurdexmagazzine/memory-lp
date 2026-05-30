@@ -236,6 +236,41 @@
     "source": "holographic"
   },
   {
+    "id": "fact-39",
+    "fact_id": 39,
+    "title": "Marcos wants memory-lp to read like a daily diary, with date, theme, context, summary, good/bad, learnings, decisions, and next steps; he also prefers screenshots delivered as media in chat",
+    "content": "Marcos wants memory-lp to read like a daily diary, with date, theme, context, summary, good/bad, learnings, decisions, and next steps; he also prefers screenshots delivered as media in chat.",
+    "category": "user_pref",
+    "tags": [
+      "memory-lp",
+      "diary",
+      "mobile",
+      "ui"
+    ],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-05-29 23:51:51",
+    "updated_at": "2026-05-29 23:51:51",
+    "entities": [],
+    "source": "holographic"
+  },
+  {
+    "id": "fact-38",
+    "fact_id": 38,
+    "title": "Marcos prefere que o memory-lp leia como um diário diário consolidado, com data, tema, contexto, resumo, o que foi bom/ruim, o que aprendi, decisões e próximos passos, em vez de rótulos técnicos soltos",
+    "content": "Marcos prefere que o memory-lp leia como um diário diário consolidado, com data, tema, contexto, resumo, o que foi bom/ruim, o que aprendi, decisões e próximos passos, em vez de rótulos técnicos soltos.",
+    "category": "user_pref",
+    "tags": [],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-05-29 23:51:24",
+    "updated_at": "2026-05-29 23:51:24",
+    "entities": [],
+    "source": "holographic"
+  },
+  {
     "id": "fact-37",
     "fact_id": 37,
     "title": "User wants Hermes agent reasoning_effort kept at high until further notice",
