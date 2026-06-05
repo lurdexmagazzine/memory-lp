@@ -236,6 +236,21 @@
     "source": "holographic"
   },
   {
+    "id": "fact-51",
+    "fact_id": 51,
+    "title": "User prefers Hermes reasoning_effort set to high by default",
+    "content": "User prefers Hermes reasoning_effort set to high by default.",
+    "category": "user_pref",
+    "tags": [],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-06-04 23:10:28",
+    "updated_at": "2026-06-04 23:10:28",
+    "entities": [],
+    "source": "holographic"
+  },
+  {
     "id": "fact-50",
     "fact_id": 50,
     "title": "The user wants the daily memory-lp diary created automatically without reminders",
