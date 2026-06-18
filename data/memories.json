@@ -236,6 +236,80 @@
     "source": "holographic"
   },
   {
+    "id": "fact-55",
+    "fact_id": 55,
+    "title": "Lurdex/GBrain embedding strategy: use Snowflake/snowflake-arctic-embed-m-v2",
+    "content": "Lurdex/GBrain embedding strategy: use Snowflake/snowflake-arctic-embed-m-v2.0 as the preferred local embedding model, CPU-only with one thread and batch around 5, started only for indexing/search windows and stopped afterward to save RAM while preserving quality.",
+    "category": "project",
+    "tags": [
+      "lurdex",
+      "gbrain",
+      "snowflake",
+      "embeddings",
+      "resource-strategy"
+    ],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-06-17 03:04:11",
+    "updated_at": "2026-06-17 03:04:11",
+    "entities": [],
+    "source": "holographic"
+  },
+  {
+    "id": "fact-54",
+    "fact_id": 54,
+    "title": "For Lurdex/GBrain local embeddings, Snowflake/snowflake-arctic-embed-m-v2",
+    "content": "For Lurdex/GBrain local embeddings, Snowflake/snowflake-arctic-embed-m-v2.0 is the current preferred model: run CPU-only, 1 thread, batch ~5, on-demand start/process/stop rather than 24/7; benchmark beat Nomic v2 MoE on RAM/speed with equal synthetic Top-1 quality.",
+    "category": "general",
+    "tags": [],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-06-17 03:04:10",
+    "updated_at": "2026-06-17 03:04:10",
+    "entities": [
+      "For Lurdex"
+    ],
+    "source": "holographic"
+  },
+  {
+    "id": "fact-53",
+    "fact_id": 53,
+    "title": "Marcos wants GBrain evaluated as an incremental memory layer over Hermes, Holographic, and markdown sources, not as a replacement; use cost-safe sandbox and non-sensitive Lurdex data before production integration",
+    "content": "Marcos wants GBrain evaluated as an incremental memory layer over Hermes, Holographic, and markdown sources, not as a replacement; use cost-safe sandbox and non-sensitive Lurdex data before production integration.",
+    "category": "project",
+    "tags": [
+      "gbrain",
+      "lurdex",
+      "memory-architecture",
+      "hermes",
+      "holographic"
+    ],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-06-17 01:25:48",
+    "updated_at": "2026-06-17 01:25:48",
+    "entities": [],
+    "source": "holographic"
+  },
+  {
+    "id": "fact-52",
+    "fact_id": 52,
+    "title": "Marcos wants GBrain evaluated as an incremental memory layer over Hermes/Holographic/markdown, not as a replacement; start with cost-safe sandbox and non-sensitive Lurdex data before any production integration",
+    "content": "Marcos wants GBrain evaluated as an incremental memory layer over Hermes/Holographic/markdown, not as a replacement; start with cost-safe sandbox and non-sensitive Lurdex data before any production integration.",
+    "category": "general",
+    "tags": [],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-06-17 01:25:42",
+    "updated_at": "2026-06-17 01:25:42",
+    "entities": [],
+    "source": "holographic"
+  },
+  {
     "id": "fact-51",
     "fact_id": 51,
     "title": "User prefers Hermes reasoning_effort set to high by default",
