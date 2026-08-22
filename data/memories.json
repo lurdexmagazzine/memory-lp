@@ -236,6 +236,28 @@
     "source": "holographic"
   },
   {
+    "id": "fact-56",
+    "fact_id": 56,
+    "title": "O repositório `memory-lp` da Lurdex agora está instalado persistentemente em `/root/",
+    "content": "O repositório `memory-lp` da Lurdex agora está instalado persistentemente em `/root/.local/share/memory-lp`; o sync noturno usa o script `/root/.hermes/scripts/lurdex-memory-lp-nightly.sh`, salva logs em `/root/.local/state/memory-lp` e os jobs ativos do memory-lp não dependem mais de `/tmp`.",
+    "category": "project",
+    "tags": [
+      "memory-lp",
+      "persistent-path",
+      "sync",
+      "cron",
+      "holographic",
+      "tmp"
+    ],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-08-21 08:17:55",
+    "updated_at": "2026-08-21 08:17:55",
+    "entities": [],
+    "source": "holographic"
+  },
+  {
     "id": "fact-55",
     "fact_id": 55,
     "title": "Lurdex/GBrain embedding strategy: use Snowflake/snowflake-arctic-embed-m-v2",
