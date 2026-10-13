@@ -236,6 +236,30 @@
     "source": "holographic"
   },
   {
+    "id": "fact-57",
+    "fact_id": 57,
+    "title": "GBrain is a mandatory live companion memory layer for Hermes in the Lurdex setup, not an optional/unconnected evaluator",
+    "content": "GBrain is a mandatory live companion memory layer for Hermes in the Lurdex setup, not an optional/unconnected evaluator. Preserve Holographic and native Hermes memory alongside it; verify the Hermes MCP registration and a real GBrain read/search round-trip whenever fixing or updating this stack. Treat the active GBrain→Hermes integration as a required acceptance criterion, not just a recommendation.",
+    "category": "project",
+    "tags": [
+      "gbrain",
+      "hermes",
+      "mandatory",
+      "integration",
+      "lurdex",
+      "mcp"
+    ],
+    "trust": 0.5,
+    "retrieval_count": 0,
+    "helpful_count": 0,
+    "created_at": "2026-10-12 23:58:53",
+    "updated_at": "2026-10-12 23:58:53",
+    "entities": [
+      "Preserve Holographic"
+    ],
+    "source": "holographic"
+  },
+  {
     "id": "fact-56",
     "fact_id": 56,
     "title": "O repositório `memory-lp` da Lurdex agora está instalado persistentemente em `/root/",
